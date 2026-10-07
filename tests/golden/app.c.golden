@@ -1,0 +1,166 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_CreateUserReq tl_CreateUserReq;
+typedef struct tl_UserResponse tl_UserResponse;
+
+struct tl_CreateUserReq {
+    int64_t f_id;
+    tlang_string f_name;
+};
+
+struct tl_UserResponse {
+    int64_t f_id;
+    tlang_string f_name;
+    tlang_string f_status;
+};
+
+bool tl_f_logger(tlang_fiber* __fib, tlang_ctx* l_ctx);
+bool tl_f_authGuard(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_m_Context__handleCreateUser(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+static bool tlj_parse_CreateUserReq(tlang_fiber* __fib, const char** __p, const char* __end, tl_CreateUserReq* __out, int __depth);
+static void tlj_write_UserResponse(tlang_fiber* __fib, tlang_buf* __b, tl_UserResponse* __v);
+
+static bool tlj_parse_CreateUserReq(tlang_fiber* __fib, const char** __p, const char* __end, tl_CreateUserReq* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 2 && memcmp(__key.data, "id", 2) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_id)) return false;
+            __seen |= UINT64_C(1) << 0;
+        } else if (__key.len == 4 && memcmp(__key.data, "name", 4) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_name)) return false;
+            __seen |= UINT64_C(1) << 1;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x3)) == UINT64_C(0x3);
+}
+
+static void tlj_write_UserResponse(tlang_fiber* __fib, tlang_buf* __b, tl_UserResponse* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"id\":");
+    json_write_i64(__b, __v->f_id);
+    TLANG_BUF_PUT_LIT(__b, ",\"name\":");
+    json_write_str(__b, __v->f_name);
+    TLANG_BUF_PUT_LIT(__b, ",\"status\":");
+    json_write_str(__b, __v->f_status);
+    tlang_buf_putc(__b, '}');
+}
+
+bool tl_f_logger(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    return true;
+}
+
+bool tl_f_authGuard(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tlang_string l_auth;
+    l_auth = tlang_ctx_header(l_ctx, TLANG_STR("Authorization"));
+    if ((int64_t)l_auth.len == 0) {
+        tlang_ctx_text(__fib, l_ctx, 401, TLANG_STR("Unauthorized"));
+        return false;
+    }
+    return true;
+}
+
+void tl_m_Context__handleCreateUser(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tl_CreateUserReq* l_req;
+    if (!tl_f_logger(__fib, l_ctx)) goto __guard_denied;
+    if (!tl_f_authGuard(__fib, l_ctx)) goto __guard_denied;
+    l_req = (tl_CreateUserReq*)tlang_alloc_zeroed(__fib, sizeof(tl_CreateUserReq));
+    const char* __jp1 = l_ctx->body.data;
+    const char* __je1 = __jp1 + l_ctx->body.len;
+    bool __t2 = tlj_parse_CreateUserReq(__fib, &__jp1, __je1, l_req, 0) && json_skip_ws(__jp1, __je1) == __je1;
+    if (!__t2) {
+        tlang_ctx_text(__fib, l_ctx, 400, TLANG_STR("Invalid JSON Payload"));
+        return;
+    }
+    {
+        tl_UserResponse* l_res;
+        {
+            tlang_tx* l_tx;
+            TxContext __tx_1;
+            if (!tlang_tx_begin(__fib, &__tx_1)) goto __tx_fail_1;
+            l_tx = &__tx_1;
+            (void)(tlang_tx_exec(__fib, l_tx, TLANG_STR("INSERT INTO users(id, name) VALUES ($1, $2)"), (tlang_pg_param[2]){ TLANG_PG_I64(l_req->f_id), TLANG_PG_STR(l_req->f_name) }, 2));
+            if (__fib->err) goto __tx_rollback_1;
+            if (!tlang_tx_commit(__fib, &__tx_1)) goto __tx_rollback_1;
+            goto __tx_end_1;
+            __tx_rollback_1: ;
+            tlang_tx_rollback(__fib, &__tx_1);
+            __tx_fail_1: ;
+            goto __tlang_catch_1;
+            __tx_end_1: ;
+        }
+        l_res = (tl_UserResponse*)tlang_alloc_zeroed(__fib, sizeof(tl_UserResponse));
+        l_res->f_id = l_req->f_id;
+        l_res->f_name = l_req->f_name;
+        l_res->f_status = TLANG_STR("SUCCESS");
+        {
+            tlang_buf __b3;
+            tlang_buf_init(__fib, &__b3, 256);
+            tlj_write_UserResponse(__fib, &__b3, l_res);
+            tlang_ctx_json(__fib, l_ctx, 201, tlang_buf_string(&__b3));
+        }
+        goto __tlang_try_end_1;
+    }
+    __tlang_catch_1: ;
+    {
+        tlang_error l_err;
+        l_err = tlang_take_error(__fib);
+        (void)l_err;
+        tlang_ctx_text(__fib, l_ctx, 500, TLANG_STR("Database Transaction Failed"));
+    }
+    __tlang_try_end_1: ;
+    return;
+    __guard_denied: ;
+    if (!l_ctx->response_sent) tlang_ctx_text(__fib, l_ctx, 403, TLANG_STR("Forbidden"));
+    return;
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    if (tlang_str_eq(l_ctx->method, TLANG_STR("POST")) && tlang_str_eq(l_ctx->path, TLANG_STR("/api/users"))) {
+        tl_m_Context__handleCreateUser(__fib, l_ctx);
+        if (__fib->err) goto __fail;
+        return;
+    }
+    tlang_ctx_text(__fib, l_ctx, 404, TLANG_STR("Endpoint Not Found"));
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = true,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

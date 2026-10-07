@@ -1,0 +1,33 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+tlang_string tl_f_selfAssign(tlang_fiber* __fib, tlang_string l_s, tlang_opt_i64 l_o, tlang_string l_so, tlang_error l_e);
+
+tlang_string tl_f_selfAssign(tlang_fiber* __fib, tlang_string l_s, tlang_opt_i64 l_o, tlang_string l_so, tlang_error l_e) {
+    tlang_string l_local;
+    tlang_error l_err;
+    (void)l_s;
+    (void)l_o;
+    (void)l_so;
+    (void)l_e;
+    l_local = TLANG_STR("x");
+    (void)l_local;
+    l_err = tlang_error_make(TLANG_STR("m"), 500);
+    (void)l_err;
+    return tlang_str_concat(__fib, tlang_str_concat(__fib, l_s, l_local), l_err.message);
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

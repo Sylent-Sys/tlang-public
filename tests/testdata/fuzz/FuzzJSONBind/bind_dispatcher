@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("interface R { id: int64; }\nfn route_dispatcher(ctx: Context): void {\n\tlet r = new R();\n\tif (!ctx.bindJson(r)) { ctx.text(400, \"bad\"); return; }\n\tctx.json(200, r);\n}\n")

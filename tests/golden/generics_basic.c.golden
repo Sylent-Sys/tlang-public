@@ -1,0 +1,91 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+void tl_f_main(tlang_fiber* __fib);
+int64_t tl_f_twice__i64(tlang_fiber* __fib, int64_t l_x);
+tlang_string tl_f_twice__str(tlang_fiber* __fib, tlang_string l_x);
+double tl_f_id__f64(tlang_fiber* __fib, double l_x);
+bool tl_f_swap__i32__bool(tlang_fiber* __fib, int32_t l_a, bool l_b);
+int64_t tl_f_id__i64(tlang_fiber* __fib, int64_t l_x);
+tlang_string tl_f_id__str(tlang_fiber* __fib, tlang_string l_x);
+
+void tl_f_main(tlang_fiber* __fib) {
+    int64_t l_a;
+    tlang_string l_b;
+    double l_c;
+    bool l_d;
+    int64_t __t1 = tl_f_twice__i64(__fib, 1);
+    if (__fib->err) goto __fail;
+    l_a = __t1;
+    (void)l_a;
+    tlang_string __t2 = tl_f_twice__str(__fib, TLANG_STR("s"));
+    if (__fib->err) goto __fail;
+    l_b = __t2;
+    (void)l_b;
+    double __t3 = tl_f_id__f64(__fib, 2.5);
+    if (__fib->err) goto __fail;
+    l_c = __t3;
+    (void)l_c;
+    bool __t4 = tl_f_swap__i32__bool(__fib, 1, true);
+    if (__fib->err) goto __fail;
+    l_d = __t4;
+    (void)l_d;
+    return;
+    __fail: ;
+    return;
+}
+
+int64_t tl_f_twice__i64(tlang_fiber* __fib, int64_t l_x) {
+    int64_t l_y;
+    int64_t __t1 = tl_f_id__i64(__fib, l_x);
+    if (__fib->err) goto __fail;
+    l_y = __t1;
+    int64_t __t2 = tl_f_id__i64(__fib, l_y);
+    if (__fib->err) goto __fail;
+    return __t2;
+    __fail: ;
+    return 0;
+}
+
+tlang_string tl_f_twice__str(tlang_fiber* __fib, tlang_string l_x) {
+    tlang_string l_y;
+    tlang_string __t1 = tl_f_id__str(__fib, l_x);
+    if (__fib->err) goto __fail;
+    l_y = __t1;
+    tlang_string __t2 = tl_f_id__str(__fib, l_y);
+    if (__fib->err) goto __fail;
+    return __t2;
+    __fail: ;
+    return (tlang_string){0};
+}
+
+double tl_f_id__f64(tlang_fiber* __fib, double l_x) {
+    return l_x;
+}
+
+bool tl_f_swap__i32__bool(tlang_fiber* __fib, int32_t l_a, bool l_b) {
+    return l_b;
+}
+
+int64_t tl_f_id__i64(tlang_fiber* __fib, int64_t l_x) {
+    return l_x;
+}
+
+tlang_string tl_f_id__str(tlang_fiber* __fib, tlang_string l_x) {
+    return l_x;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

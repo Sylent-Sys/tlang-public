@@ -1,0 +1,38 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+tlang_string tl_f_greet(tlang_fiber* __fib, tlang_string l_name);
+
+tlang_string tl_f_greet(tlang_fiber* __fib, tlang_string l_name) {
+    tlang_string l_s;
+    tlang_string l_t;
+    tlang_string l_u;
+    tlang_string l_folded;
+    bool l_eq;
+    bool l_ne;
+    l_s = tlang_str_concat(__fib, tlang_str_concat(__fib, TLANG_STR("Hello, "), l_name), TLANG_STR("!"));
+    l_t = TLANG_STR("tab\011here \"quoted\" back\\slash");
+    l_u = TLANG_STR("nul\000byte and \303\251 and ?\077= trigraph ?\077!");
+    l_folded = TLANG_STR("abc");
+    l_eq = tlang_str_eq(l_s, l_t);
+    l_ne = !(tlang_str_eq(l_s, l_u));
+    if (l_eq || l_ne) {
+        return l_folded;
+    }
+    return tlang_str_concat(__fib, tlang_str_concat(__fib, l_s, l_t), l_u);
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

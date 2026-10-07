@@ -1,0 +1,3 @@
+# Corpus seeds are exact byte inputs for the fuzzer (HTTP seeds contain CRLFs
+# the parser requires). Never apply end-of-line normalization to them.
+corpus/** -text

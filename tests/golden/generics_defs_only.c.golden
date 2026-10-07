@@ -1,0 +1,51 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Item tl_Item;
+typedef struct tl_Page__Item tl_Page__Item;
+TLANG_SLICE_DEFINE(Item, tl_Item*)
+
+struct tl_Item {
+    int64_t f_id;
+};
+
+struct tl_Page__Item {
+    tlang_slice_Item* f_items;
+    int64_t f_total;
+};
+
+void tl_f_useMk(tlang_fiber* __fib, tl_Item* l_it);
+void tl_f_main(tlang_fiber* __fib);
+void tl_f_mk__Item(tlang_fiber* __fib, tl_Item* l_x);
+
+void tl_f_useMk(tlang_fiber* __fib, tl_Item* l_it) {
+    tl_f_mk__Item(__fib, l_it);
+    if (__fib->err) goto __fail;
+    return;
+    __fail: ;
+    return;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+}
+
+void tl_f_mk__Item(tlang_fiber* __fib, tl_Item* l_x) {
+    tl_Page__Item* l_p;
+    l_p = NULL;
+    (void)l_p;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

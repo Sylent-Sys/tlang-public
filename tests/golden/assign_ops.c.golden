@@ -1,0 +1,152 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Node tl_Node;
+
+struct tl_Node {
+    int64_t f_n;
+    double f_f;
+    tlang_string f_s;
+    tlang_slice_i64* f_xs;
+    tl_Node* f_child;
+};
+
+struct tl_globals {
+    int64_t g_g;
+    tlang_string g_gs;
+};
+
+tlang_slice_i64* tl_f_getArr(tlang_fiber* __fib, tlang_slice_i64* l_xs);
+int64_t tl_f_idx(tlang_fiber* __fib, int64_t l_i);
+int64_t tl_f_val(tlang_fiber* __fib, int64_t l_v);
+tl_Node* tl_f_obj(tlang_fiber* __fib, tl_Node* l_nd);
+tlang_error tl_f_mkErr(tlang_fiber* __fib);
+void tl_f_assigns(tlang_fiber* __fib, tl_Node* l_nd, tlang_slice_i64* l_xs, int64_t l_d);
+
+tlang_slice_i64* tl_f_getArr(tlang_fiber* __fib, tlang_slice_i64* l_xs) {
+    return l_xs;
+}
+
+int64_t tl_f_idx(tlang_fiber* __fib, int64_t l_i) {
+    return l_i;
+}
+
+int64_t tl_f_val(tlang_fiber* __fib, int64_t l_v) {
+    return tlang_mul_i64(l_v, 2);
+}
+
+tl_Node* tl_f_obj(tlang_fiber* __fib, tl_Node* l_nd) {
+    return l_nd;
+}
+
+tlang_error tl_f_mkErr(tlang_fiber* __fib) {
+    return tlang_error_make(TLANG_STR("e"), 400);
+}
+
+void tl_f_assigns(tlang_fiber* __fib, tl_Node* l_nd, tlang_slice_i64* l_xs, int64_t l_d) {
+    int64_t l_x;
+    double l_f;
+    tlang_string l_s;
+    tlang_error l_e;
+    l_x = 1;
+    l_x = 2;
+    int64_t __t1 = tl_f_val(__fib, 3);
+    if (__fib->err) goto __fail;
+    l_x = tlang_add_i64(l_x, __t1);
+    l_f = 1.0;
+    l_f = tlang_mod_f64(l_f, 2.0);
+    l_s = TLANG_STR("a");
+    l_s = tlang_str_concat(__fib, l_s, TLANG_STR("b"));
+    __fib->globals->g_g = tlang_add_i64(__fib->globals->g_g, 1);
+    int64_t __t2 = tl_f_val(__fib, 2);
+    if (__fib->err) goto __fail;
+    __fib->globals->g_g = tlang_add_i64(__fib->globals->g_g, __t2);
+    __fib->globals->g_g = tlang_add_i64(__fib->globals->g_g, 1);
+    __fib->globals->g_gs = tlang_str_concat(__fib, __fib->globals->g_gs, TLANG_STR("z"));
+    l_nd->f_n = 5;
+    l_nd->f_n = tlang_add_i64(l_nd->f_n, l_d);
+    l_nd->f_n = tlang_add_i64(l_nd->f_n, 1);
+    l_nd->f_f = l_nd->f_f * 2.0;
+    l_nd->f_s = tlang_str_concat(__fib, l_nd->f_s, TLANG_STR("!"));
+    int64_t __t3 = tlang_div_i64(__fib, l_nd->f_n, l_d);
+    if (__fib->err) goto __fail;
+    l_nd->f_n = __t3;
+    TLANG_SLICE_AT(__fib, l_xs, 0, int64_t) = 1;
+    if (__fib->err) goto __fail;
+    TLANG_SLICE_AT(__fib, l_xs, 1, int64_t) = tlang_add_i64(TLANG_SLICE_AT(__fib, l_xs, 1, int64_t), 2);
+    if (__fib->err) goto __fail;
+    if (!tlang_index_ok(__fib, l_d, l_xs->len)) goto __fail;
+    int64_t __t4 = tl_f_val(__fib, l_d);
+    if (__fib->err) goto __fail;
+    TLANG_SLICE_AT(__fib, l_xs, l_d, int64_t) = __t4;
+    int64_t __t5 = tlang_mod_i64(__fib, TLANG_SLICE_AT(__fib, l_xs, l_d, int64_t), l_d);
+    if (__fib->err) goto __fail;
+    TLANG_SLICE_AT(__fib, l_xs, l_d, int64_t) = __t5;
+    if (__fib->err) goto __fail;
+    tlang_slice_i64* __t6 = tl_f_getArr(__fib, l_xs);
+    if (__fib->err) goto __fail;
+    int64_t __t7 = tl_f_idx(__fib, 0);
+    if (__fib->err) goto __fail;
+    if (!tlang_index_ok(__fib, __t7, __t6->len)) goto __fail;
+    int64_t __t8 = tl_f_val(__fib, 1);
+    if (__fib->err) goto __fail;
+    TLANG_SLICE_AT(__fib, __t6, __t7, int64_t) = __t8;
+    tlang_slice_i64* __t9 = tl_f_getArr(__fib, l_xs);
+    if (__fib->err) goto __fail;
+    int64_t __t10 = tl_f_idx(__fib, 1);
+    if (__fib->err) goto __fail;
+    if (!tlang_index_ok(__fib, __t10, __t9->len)) goto __fail;
+    int64_t __t11 = tl_f_val(__fib, 2);
+    if (__fib->err) goto __fail;
+    TLANG_SLICE_AT(__fib, __t9, __t10, int64_t) = tlang_add_i64(TLANG_SLICE_AT(__fib, __t9, __t10, int64_t), __t11);
+    if (__fib->err) goto __fail;
+    tl_Node* __t12 = tl_f_obj(__fib, l_nd);
+    if (__fib->err) goto __fail;
+    int64_t __t13 = tl_f_val(__fib, 3);
+    if (__fib->err) goto __fail;
+    __t12->f_n = __t13;
+    tl_Node* __t14 = tl_f_obj(__fib, l_nd);
+    if (__fib->err) goto __fail;
+    int64_t __t15 = tl_f_val(__fib, 4);
+    if (__fib->err) goto __fail;
+    __t14->f_n = tlang_sub_i64(__t14->f_n, __t15);
+    TLANG_SLICE_AT(__fib, l_nd->f_xs, 0, int64_t) = 9;
+    if (__fib->err) goto __fail;
+    l_e = tlang_error_make(TLANG_STR("m"), 500);
+    l_e.status = 404;
+    l_e.status = tlang_add_i32(l_e.status, 1);
+    l_e.status = tlang_add_i32(l_e.status, 1);
+    l_e.status = tlang_div_i32(__fib, l_e.status, 2);
+    l_e.message = TLANG_STR("x");
+    l_e.message = tlang_str_concat(__fib, l_e.message, TLANG_STR("!"));
+    tlang_error __t16 = tl_f_mkErr(__fib);
+    if (__fib->err) goto __fail;
+    __t16.status = tlang_add_i32(__t16.status, 1);
+    tlang_error __t17 = tl_f_mkErr(__fib);
+    if (__fib->err) goto __fail;
+    __t17.message = TLANG_STR("discarded");
+    (void)__t17;
+    return;
+    __fail: ;
+    return;
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    __fib->globals->g_g = 0;
+    __fib->globals->g_gs = TLANG_STR("");
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

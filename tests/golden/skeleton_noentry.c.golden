@@ -1,0 +1,29 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Point tl_Point;
+
+struct tl_Point {
+    int64_t f_x;
+    int64_t f_y;
+};
+
+void tl_f_helper(tlang_fiber* __fib, tl_Point* l_p);
+
+void tl_f_helper(tlang_fiber* __fib, tl_Point* l_p) {
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

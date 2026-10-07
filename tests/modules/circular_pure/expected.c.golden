@@ -1,0 +1,63 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_a_ts_y97pxb__fromA(tlang_fiber* __fib);
+int64_t tl_f_a_ts_y97pxb__callB(tlang_fiber* __fib);
+int64_t tl_f_b_ts_11y9gbo__fromB(tlang_fiber* __fib);
+int64_t tl_f_b_ts_11y9gbo__callA(tlang_fiber* __fib);
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib);
+
+int64_t tl_f_a_ts_y97pxb__fromA(tlang_fiber* __fib) {
+    return 1;
+}
+
+int64_t tl_f_a_ts_y97pxb__callB(tlang_fiber* __fib) {
+    int64_t __t1 = tl_f_b_ts_11y9gbo__fromB(__fib);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int64_t tl_f_b_ts_11y9gbo__fromB(tlang_fiber* __fib) {
+    return 2;
+}
+
+int64_t tl_f_b_ts_11y9gbo__callA(tlang_fiber* __fib) {
+    int64_t __t1 = tl_f_a_ts_y97pxb__fromA(__fib);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib) {
+    int64_t l_x;
+    int64_t l_y;
+    int64_t __t1 = tl_f_a_ts_y97pxb__callB(__fib);
+    if (__fib->err) goto __fail;
+    l_x = __t1;
+    (void)l_x;
+    int64_t __t2 = tl_f_b_ts_11y9gbo__callA(__fib);
+    if (__fib->err) goto __fail;
+    l_y = __t2;
+    (void)l_y;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main_ts_1cmw5wz__main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

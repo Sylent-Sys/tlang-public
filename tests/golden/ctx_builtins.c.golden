@@ -1,0 +1,56 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+
+static const tlang_route_seg __tl_r1_segs[2] = {
+    { TLANG_SEG_STATIC, TLANG_STR_INIT("users") },
+    { TLANG_SEG_PARAM, TLANG_STR_INIT("id") }
+};
+static const tlang_route __tl_r1 = { TLANG_STR_INIT("GET"), __tl_r1_segs, 2, 1 };
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tlang_string l_m;
+    tlang_string l_p;
+    tlang_string l_q;
+    tlang_string l_b;
+    tlang_string l_h;
+    tlang_string l_qv;
+    l_m = l_ctx->method;
+    l_p = l_ctx->path;
+    l_q = l_ctx->query;
+    l_b = l_ctx->body;
+    l_h = tlang_ctx_header(l_ctx, TLANG_STR("X-Id"));
+    l_qv = tlang_ctx_query(__fib, l_ctx, TLANG_STR("page"));
+    if (tlang_ctx_match(l_ctx, &__tl_r1)) {
+        tlang_string l_id;
+        int64_t l_n;
+        l_id = tlang_ctx_param(l_ctx, TLANG_STR("id"));
+        int64_t __t1 = tlang_ctx_param_int(__fib, l_ctx, TLANG_STR("id"));
+        if (__fib->err) goto __fail;
+        l_n = __t1;
+        tlang_ctx_set_header(__fib, l_ctx, TLANG_STR("X-Id"), l_id);
+        if (__fib->err) goto __fail;
+        tlang_ctx_text(__fib, l_ctx, 200, tlang_i64_to_string(__fib, l_n));
+        return;
+    }
+    tlang_ctx_text(__fib, l_ctx, 404, tlang_str_concat(__fib, tlang_str_concat(__fib, tlang_str_concat(__fib, tlang_str_concat(__fib, tlang_str_concat(__fib, l_m, l_p), l_q), l_b), l_h), l_qv));
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("fn id<T>(x: T): T { return x; }\nfn main(): void { let a = id<int64>(1); }\n")

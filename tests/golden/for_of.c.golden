@@ -1,0 +1,97 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Item tl_Item;
+typedef struct tl_Bag tl_Bag;
+TLANG_SLICE_DEFINE(Item, tl_Item*)
+TLANG_SLICE_DEFINE(arr_i64, tlang_slice_i64*)
+
+struct tl_Item {
+    int64_t f_id;
+};
+
+struct tl_Bag {
+    tlang_slice_Item* f_items;
+};
+
+tlang_slice_Item* tl_f_items(tlang_fiber* __fib, tl_Bag* l_b);
+int64_t tl_f_sum(tlang_fiber* __fib, tlang_slice_i64* l_xs, tl_Bag* l_b);
+
+tlang_slice_Item* tl_f_items(tlang_fiber* __fib, tl_Bag* l_b) {
+    return l_b->f_items;
+}
+
+int64_t tl_f_sum(tlang_fiber* __fib, tlang_slice_i64* l_xs, tl_Bag* l_b) {
+    int64_t l_total;
+    l_total = 0;
+    for (int64_t __i1 = 0; __i1 < l_xs->len; __i1++) {
+        int64_t l_x;
+        l_x = l_xs->items[__i1];
+        l_total = tlang_add_i64(l_total, l_x);
+    }
+    tlang_slice_Item* __t2 = tl_f_items(__fib, l_b);
+    if (__fib->err) goto __fail;
+    for (int64_t __i3 = 0; __i3 < __t2->len; __i3++) {
+        tl_Item* l_it;
+        l_it = __t2->items[__i3];
+        l_total = tlang_add_i64(l_total, l_it->f_id);
+    }
+    tlang_slice_Item* __t4 = l_b->f_items;
+    for (int64_t __i5 = 0; __i5 < __t4->len; __i5++) {
+        tl_Item* l_it;
+        l_it = __t4->items[__i5];
+        l_total = tlang_add_i64(l_total, l_it->f_id);
+    }
+    for (int64_t __i6 = 0; __i6 < l_xs->len; __i6++) {
+        int64_t l_unused;
+        l_unused = l_xs->items[__i6];
+        (void)l_unused;
+        l_total = tlang_add_i64(l_total, 1);
+    }
+    tlang_slice_arr_i64* __t7 = TLANG_SLICE_NEW(__fib, arr_i64);
+    tlang_slice_i64* __t8 = TLANG_SLICE_NEW(__fib, i64);
+    TLANG_SLICE_RESERVE(__fib, __t8, 2);
+    TLANG_SLICE_PUSH(__fib, __t8, 1);
+    TLANG_SLICE_PUSH(__fib, __t8, 2);
+    tlang_slice_i64* __t9 = TLANG_SLICE_NEW(__fib, i64);
+    TLANG_SLICE_RESERVE(__fib, __t9, 1);
+    TLANG_SLICE_PUSH(__fib, __t9, 3);
+    TLANG_SLICE_RESERVE(__fib, __t7, 2);
+    TLANG_SLICE_PUSH(__fib, __t7, __t8);
+    TLANG_SLICE_PUSH(__fib, __t7, __t9);
+    for (int64_t __i10 = 0; __i10 < __t7->len; __i10++) {
+        tlang_slice_i64* l_row;
+        l_row = __t7->items[__i10];
+        for (int64_t __i11 = 0; __i11 < l_row->len; __i11++) {
+            int64_t l_v;
+            l_v = l_row->items[__i11];
+            l_total = tlang_add_i64(l_total, l_v);
+        }
+    }
+    for (int64_t __i12 = 0; __i12 < l_xs->len; __i12++) {
+        int64_t l_x;
+        l_x = l_xs->items[__i12];
+        if (l_x > 10) {
+            TLANG_SLICE_PUSH(__fib, l_xs, tlang_sub_i64(l_x, 1));
+            break;
+        }
+    }
+    return l_total;
+    __fail: ;
+    return 0;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

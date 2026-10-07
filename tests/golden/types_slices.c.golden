@@ -1,0 +1,49 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Item tl_Item;
+typedef struct tl_Bag tl_Bag;
+TLANG_SLICE_DEFINE(Item, tl_Item*)
+TLANG_SLICE_DEFINE(arr_i64, tlang_slice_i64*)
+TLANG_SLICE_DEFINE(opt_Item, tl_Item*)
+TLANG_SLICE_DEFINE(opt_str, tlang_string)
+TLANG_SLICE_DEFINE(opt_f64, tlang_opt_f64)
+TLANG_SLICE_DEFINE(opt_i32, tlang_opt_i32)
+TLANG_SLICE_DEFINE(arr_Item, tlang_slice_Item*)
+TLANG_SLICE_DEFINE(Error, tlang_error)
+
+struct tl_Item {
+    int64_t f_id;
+};
+
+struct tl_Bag {
+    tlang_slice_Item* f_items;
+    tlang_slice_arr_i64* f_grid;
+    tlang_slice_opt_Item* f_maybe;
+    tlang_slice_opt_str* f_names;
+    tlang_slice_opt_f64* f_ratios;
+    tlang_slice_opt_i32* f_counts;
+    tlang_slice_arr_Item* f_deep;
+    tlang_slice_Error* f_errs;
+    tlang_slice_bool* f_flags;
+};
+
+void tl_f_main(tlang_fiber* __fib);
+
+void tl_f_main(tlang_fiber* __fib) {
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

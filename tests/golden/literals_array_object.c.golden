@@ -1,0 +1,136 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_User tl_User;
+TLANG_SLICE_DEFINE(arr_i64, tlang_slice_i64*)
+TLANG_SLICE_DEFINE(opt_i64, tlang_opt_i64)
+TLANG_SLICE_DEFINE(User, tl_User*)
+
+struct tl_User {
+    int64_t f_id;
+    tlang_string f_name;
+    tlang_slice_str* f_tags;
+    tlang_string f_nick;
+};
+
+struct tl_globals {
+    tlang_slice_str* g_names;
+    tlang_slice_i64* g_empty;
+};
+
+int64_t tl_f_mk(tlang_fiber* __fib, int64_t l_n);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_mk(tlang_fiber* __fib, int64_t l_n) {
+    return tlang_add_i64(l_n, 1);
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    tlang_slice_i64* l_xs;
+    tlang_slice_i64* l_ys;
+    tlang_slice_arr_i64* l_zs;
+    tlang_slice_str* l_ss;
+    tlang_slice_opt_i64* l_os;
+    tl_User* l_u;
+    tl_User* l_v;
+    tlang_slice_User* l_us;
+    tlang_slice_i64* __t1 = TLANG_SLICE_NEW(__fib, i64);
+    TLANG_SLICE_RESERVE(__fib, __t1, 3);
+    TLANG_SLICE_PUSH(__fib, __t1, 1);
+    TLANG_SLICE_PUSH(__fib, __t1, 2);
+    TLANG_SLICE_PUSH(__fib, __t1, 3);
+    l_xs = __t1;
+    (void)l_xs;
+    tlang_slice_i64* __t2 = TLANG_SLICE_NEW(__fib, i64);
+    int64_t __t3 = tl_f_mk(__fib, 1);
+    if (__fib->err) goto __fail;
+    int64_t __t4 = tl_f_mk(__fib, 2);
+    if (__fib->err) goto __fail;
+    TLANG_SLICE_RESERVE(__fib, __t2, 2);
+    TLANG_SLICE_PUSH(__fib, __t2, __t3);
+    TLANG_SLICE_PUSH(__fib, __t2, __t4);
+    l_ys = __t2;
+    (void)l_ys;
+    tlang_slice_arr_i64* __t5 = TLANG_SLICE_NEW(__fib, arr_i64);
+    tlang_slice_i64* __t6 = TLANG_SLICE_NEW(__fib, i64);
+    TLANG_SLICE_RESERVE(__fib, __t6, 2);
+    TLANG_SLICE_PUSH(__fib, __t6, 1);
+    TLANG_SLICE_PUSH(__fib, __t6, 2);
+    tlang_slice_i64* __t7 = TLANG_SLICE_NEW(__fib, i64);
+    TLANG_SLICE_RESERVE(__fib, __t7, 1);
+    TLANG_SLICE_PUSH(__fib, __t7, 3);
+    TLANG_SLICE_RESERVE(__fib, __t5, 2);
+    TLANG_SLICE_PUSH(__fib, __t5, __t6);
+    TLANG_SLICE_PUSH(__fib, __t5, __t7);
+    l_zs = __t5;
+    (void)l_zs;
+    tlang_slice_str* __t8 = TLANG_SLICE_NEW(__fib, str);
+    TLANG_SLICE_RESERVE(__fib, __t8, 2);
+    TLANG_SLICE_PUSH(__fib, __t8, TLANG_STR("x"));
+    TLANG_SLICE_PUSH(__fib, __t8, TLANG_STR("y"));
+    l_ss = __t8;
+    (void)l_ss;
+    tlang_slice_opt_i64* __t9 = TLANG_SLICE_NEW(__fib, opt_i64);
+    TLANG_SLICE_RESERVE(__fib, __t9, 2);
+    TLANG_SLICE_PUSH(__fib, __t9, TLANG_SOME(i64, 1));
+    TLANG_SLICE_PUSH(__fib, __t9, TLANG_NONE(i64));
+    l_os = __t9;
+    (void)l_os;
+    tl_User* __t10 = (tl_User*)tlang_alloc_zeroed(__fib, sizeof(tl_User));
+    __t10->f_tags = TLANG_SLICE_NEW(__fib, str);
+    __t10->f_id = 1;
+    __t10->f_name = TLANG_STR("a");
+    tlang_slice_str* __t11 = TLANG_SLICE_NEW(__fib, str);
+    TLANG_SLICE_RESERVE(__fib, __t11, 1);
+    TLANG_SLICE_PUSH(__fib, __t11, TLANG_STR("t"));
+    __t10->f_tags = __t11;
+    l_u = __t10;
+    tl_User* __t12 = (tl_User*)tlang_alloc_zeroed(__fib, sizeof(tl_User));
+    __t12->f_tags = TLANG_SLICE_NEW(__fib, str);
+    __t12->f_name = TLANG_STR("b");
+    int64_t __t13 = tl_f_mk(__fib, 3);
+    if (__fib->err) goto __fail;
+    __t12->f_id = __t13;
+    tlang_slice_str* __t14 = TLANG_SLICE_NEW(__fib, str);
+    __t12->f_tags = __t14;
+    __t12->f_nick = tlang_str_some(TLANG_STR("n"));
+    l_v = __t12;
+    tlang_slice_User* __t15 = TLANG_SLICE_NEW(__fib, User);
+    TLANG_SLICE_RESERVE(__fib, __t15, 2);
+    TLANG_SLICE_PUSH(__fib, __t15, l_u);
+    TLANG_SLICE_PUSH(__fib, __t15, l_v);
+    l_us = __t15;
+    (void)l_us;
+    tlang_slice_str* __t16 = __fib->globals->g_names;
+    TLANG_SLICE_PUSH(__fib, __t16, TLANG_STR("c"));
+    tlang_slice_i64* __t17 = TLANG_SLICE_NEW_GLOBAL(__fib, i64);
+    __fib->globals->g_empty = __t17;
+    return;
+    __fail: ;
+    return;
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    tlang_slice_str* __t1 = TLANG_SLICE_NEW_GLOBAL(__fib, str);
+    TLANG_SLICE_RESERVE(__fib, __t1, 2);
+    TLANG_SLICE_PUSH(__fib, __t1, TLANG_STR("a"));
+    TLANG_SLICE_PUSH(__fib, __t1, TLANG_STR("b"));
+    __fib->globals->g_names = __t1;
+    tlang_slice_i64* __t2 = TLANG_SLICE_NEW_GLOBAL(__fib, i64);
+    __fib->globals->g_empty = __t2;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

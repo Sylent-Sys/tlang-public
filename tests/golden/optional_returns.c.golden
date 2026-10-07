@@ -1,0 +1,85 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_User tl_User;
+
+struct tl_User {
+    int64_t f_id;
+};
+
+tlang_opt_f64 tl_f_f64opt(tlang_fiber* __fib, double l_x);
+tlang_opt_i32 tl_f_i32opt(tlang_fiber* __fib, int32_t l_x, int32_t l_y);
+tlang_opt_i64 tl_f_i64opt(tlang_fiber* __fib, int64_t l_x);
+tlang_opt_bool tl_f_boolopt(tlang_fiber* __fib, bool l_b);
+tlang_string tl_f_stropt(tlang_fiber* __fib, tlang_string l_s, bool l_empty);
+tl_User* tl_f_useropt(tlang_fiber* __fib, tl_User* l_u, bool l_none);
+tlang_opt_i64 tl_f_widen(tlang_fiber* __fib, int64_t l_n);
+
+tlang_opt_f64 tl_f_f64opt(tlang_fiber* __fib, double l_x) {
+    if (l_x > 0.0) {
+        return TLANG_SOME(f64, l_x);
+    }
+    return TLANG_NONE(f64);
+}
+
+tlang_opt_i32 tl_f_i32opt(tlang_fiber* __fib, int32_t l_x, int32_t l_y) {
+    if (l_x > l_y) {
+        return TLANG_SOME(i32, l_x);
+    }
+    return TLANG_NONE(i32);
+}
+
+tlang_opt_i64 tl_f_i64opt(tlang_fiber* __fib, int64_t l_x) {
+    if (l_x == 0) {
+        return TLANG_NONE(i64);
+    }
+    return TLANG_SOME(i64, l_x);
+}
+
+tlang_opt_bool tl_f_boolopt(tlang_fiber* __fib, bool l_b) {
+    if (l_b) {
+        return TLANG_SOME(bool, true);
+    }
+    return TLANG_NONE(bool);
+}
+
+tlang_string tl_f_stropt(tlang_fiber* __fib, tlang_string l_s, bool l_empty) {
+    if (l_empty) {
+        return TLANG_STR_NULL;
+    }
+    return tlang_str_some(l_s);
+}
+
+tl_User* tl_f_useropt(tlang_fiber* __fib, tl_User* l_u, bool l_none) {
+    if (l_none) {
+        return NULL;
+    }
+    return l_u;
+}
+
+tlang_opt_i64 tl_f_widen(tlang_fiber* __fib, int64_t l_n) {
+    tlang_opt_i64 l_o;
+    tlang_opt_i64 l_p;
+    tlang_opt_i64 l_q;
+    l_o = TLANG_SOME(i64, l_n);
+    l_p = TLANG_NONE(i64);
+    (void)l_p;
+    l_q = (tlang_opt_i64){0};
+    (void)l_q;
+    return l_o;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

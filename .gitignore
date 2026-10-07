@@ -1,0 +1,39 @@
+# Runtime C build output
+runtime/build/
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.exe
+/tlang
+tlang.test
+
+# Release build output (.github/workflows/release.yml, RELEASING.md)
+/build/
+/dist/
+/lsp/
+*.vsix
+
+# Go test/coverage artifacts
+*.out
+coverage.*
+
+# ASan crash reports and retained diagnostic binaries
+.asan-diagnostics/
+
+# Benchmark summary artifact (regenerated per run, never committed)
+tests/bench/.sweep-summary.jsonl
+
+# Local environment and secrets
+.env
+*.local
+
+# Workflow task artifacts (plans, reviews, verification notes)
+.agents/
+
+# Editor / OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,47 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Node__i64 tl_Node__i64;
+typedef struct tl_A__i64 tl_A__i64;
+typedef struct tl_B__i64 tl_B__i64;
+
+struct tl_Node__i64 {
+    tl_Node__i64* f_next;
+};
+
+struct tl_A__i64 {
+    tl_B__i64* f_b;
+};
+
+struct tl_B__i64 {
+    tl_A__i64* f_a;
+};
+
+void tl_f_main(tlang_fiber* __fib);
+
+void tl_f_main(tlang_fiber* __fib) {
+    tl_Node__i64* l_n;
+    tl_A__i64* l_a;
+    tl_B__i64* l_b;
+    l_n = (tl_Node__i64*)tlang_alloc_zeroed(__fib, sizeof(tl_Node__i64));
+    (void)l_n;
+    l_a = (tl_A__i64*)tlang_alloc_zeroed(__fib, sizeof(tl_A__i64));
+    (void)l_a;
+    l_b = (tl_B__i64*)tlang_alloc_zeroed(__fib, sizeof(tl_B__i64));
+    (void)l_b;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

@@ -1,0 +1,126 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_User tl_User;
+
+struct tl_User {
+    int64_t f_id;
+};
+
+int64_t tl_f_opts(tlang_fiber* __fib, tlang_opt_i64 l_a, tlang_opt_i32 l_b, tlang_opt_f64 l_c, tlang_opt_bool l_d, tlang_string l_s, tl_User* l_u, tlang_slice_i64* l_xs);
+void tl_f_widenArgs(tlang_fiber* __fib, int64_t l_n, tlang_string l_s, tl_User* l_u);
+void tl_f_takeOpt(tlang_fiber* __fib, tlang_opt_i64 l_a, tlang_string l_s, tl_User* l_u);
+
+int64_t tl_f_opts(tlang_fiber* __fib, tlang_opt_i64 l_a, tlang_opt_i32 l_b, tlang_opt_f64 l_c, tlang_opt_bool l_d, tlang_string l_s, tl_User* l_u, tlang_slice_i64* l_xs) {
+    int64_t l_total;
+    int64_t l_forced;
+    int32_t l_forced32;
+    double l_forcedF;
+    bool l_forcedB;
+    tlang_string l_forcedS;
+    tl_User* l_forcedU;
+    tlang_slice_i64* l_forcedXs;
+    int64_t l_ra;
+    int32_t l_rb;
+    double l_rc;
+    bool l_rdd;
+    tlang_string l_rs;
+    tl_User* l_ru;
+    bool l_isNull;
+    bool l_strNull;
+    l_total = 0;
+    if (l_a.has) {
+        l_total = tlang_add_i64(l_total, l_a.v);
+    }
+    if (l_b.has) {
+        l_total = tlang_add_i64(l_total, (int64_t)l_b.v);
+    }
+    if (l_c.has && (l_c.v > 1.0)) {
+        l_total = tlang_add_i64(l_total, tlang_f64_to_i64(l_c.v));
+    }
+    if (l_d.has) {
+        if (l_d.v) {
+            l_total = tlang_add_i64(l_total, 1);
+        }
+    }
+    if (l_s.data == NULL) {
+        return l_total;
+    }
+    l_total = tlang_add_i64(l_total, (int64_t)l_s.len);
+    if (l_u != NULL) {
+        l_total = tlang_add_i64(l_total, l_u->f_id);
+    }
+    if (l_xs != NULL) {
+        l_total = tlang_add_i64(l_total, l_xs->len);
+    }
+    int64_t __t1 = tlang_unwrap_i64(__fib, l_a);
+    if (__fib->err) goto __fail;
+    l_forced = __t1;
+    int32_t __t2 = tlang_unwrap_i32(__fib, l_b);
+    if (__fib->err) goto __fail;
+    l_forced32 = __t2;
+    (void)l_forced32;
+    double __t3 = tlang_unwrap_f64(__fib, l_c);
+    if (__fib->err) goto __fail;
+    l_forcedF = __t3;
+    (void)l_forcedF;
+    bool __t4 = tlang_unwrap_bool(__fib, l_d);
+    if (__fib->err) goto __fail;
+    l_forcedB = __t4;
+    (void)l_forcedB;
+    tlang_string __t5 = tlang_unwrap_str(__fib, l_s);
+    if (__fib->err) goto __fail;
+    l_forcedS = __t5;
+    (void)l_forcedS;
+    tl_User* __t6 = (tl_User*)tlang_unwrap_ptr(__fib, l_u);
+    if (__fib->err) goto __fail;
+    l_forcedU = __t6;
+    (void)l_forcedU;
+    tlang_slice_i64* __t7 = (tlang_slice_i64*)tlang_unwrap_ptr(__fib, l_xs);
+    if (__fib->err) goto __fail;
+    l_forcedXs = __t7;
+    (void)l_forcedXs;
+    l_ra = l_a.has ? l_a.v : 0;
+    l_rb = l_b.has ? l_b.v : 7;
+    l_rc = l_c.has ? l_c.v : 1.5;
+    (void)l_rc;
+    l_rdd = l_d.has ? l_d.v : false;
+    (void)l_rdd;
+    l_rs = l_s.data != NULL ? l_s : TLANG_STR("none");
+    (void)l_rs;
+    l_ru = l_u != NULL ? l_u : (tl_User*)tlang_alloc_zeroed(__fib, sizeof(tl_User));
+    (void)l_ru;
+    l_isNull = !l_a.has;
+    (void)l_isNull;
+    l_strNull = l_s.data != NULL;
+    (void)l_strNull;
+    return tlang_add_i64(tlang_add_i64(tlang_add_i64(l_total, l_forced), l_ra), (int64_t)l_rb);
+    __fail: ;
+    return 0;
+}
+
+void tl_f_widenArgs(tlang_fiber* __fib, int64_t l_n, tlang_string l_s, tl_User* l_u) {
+    tl_f_takeOpt(__fib, TLANG_SOME(i64, l_n), tlang_str_some(l_s), l_u);
+    if (__fib->err) goto __fail;
+    return;
+    __fail: ;
+    return;
+}
+
+void tl_f_takeOpt(tlang_fiber* __fib, tlang_opt_i64 l_a, tlang_string l_s, tl_User* l_u) {
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

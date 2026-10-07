@@ -1,0 +1,55 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Cfg tl_Cfg;
+TLANG_SLICE_DEFINE(Cfg, tl_Cfg*)
+
+struct tl_Cfg {
+    int32_t f_port;
+};
+
+struct tl_globals {
+    int64_t g_counter;
+    int64_t g_limit;
+    int64_t g_negative;
+    int32_t g_small;
+    int32_t g_smallNeg;
+    double g_ratio;
+    double g_half;
+    tlang_string g_label;
+    bool g_enabled;
+    tlang_opt_i64 g_maybe;
+    tlang_slice_Cfg* g_cfgs;
+    tlang_string g_name;
+};
+
+void tl_f_main(tlang_fiber* __fib);
+
+void tl_f_main(tlang_fiber* __fib) {
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    __fib->globals->g_limit = 100;
+    __fib->globals->g_negative = -9;
+    __fib->globals->g_small = 7;
+    __fib->globals->g_smallNeg = -5;
+    __fib->globals->g_ratio = 2.0;
+    __fib->globals->g_half = 0.5;
+    __fib->globals->g_label = TLANG_STR("svc\011\"x\"\\");
+    __fib->globals->g_enabled = true;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

@@ -1,0 +1,96 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_User tl_User;
+
+struct tl_User {
+    int64_t f_id;
+};
+
+int64_t tl_f_a(tlang_fiber* __fib);
+tlang_string tl_f_b(tlang_fiber* __fib);
+tlang_opt_f64 tl_f_c(tlang_fiber* __fib);
+tl_User* tl_f_d(tlang_fiber* __fib);
+tlang_error tl_f_e(tlang_fiber* __fib);
+bool tl_f_f(tlang_fiber* __fib);
+tlang_opt_i32 tl_f_g(tlang_fiber* __fib);
+tlang_slice_i64* tl_f_h(tlang_fiber* __fib);
+tlang_string tl_f_i(tlang_fiber* __fib);
+tl_User* tl_f_j(tlang_fiber* __fib);
+void tl_f_v(tlang_fiber* __fib);
+void tl_f_params(tlang_fiber* __fib, int32_t l_n, tlang_opt_i64 l_m, tlang_string l_s, tl_User* l_u, tlang_slice_i64* l_xs, tlang_ctx* l_ctx, tlang_opt_bool l_flag);
+int64_t tl_m_User__twice(tlang_fiber* __fib, tl_User* l_u);
+void tl_m_Context__handle(tlang_fiber* __fib, tlang_ctx* l_c);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_a(tlang_fiber* __fib) {
+    return 0;
+}
+
+tlang_string tl_f_b(tlang_fiber* __fib) {
+    return (tlang_string){0};
+}
+
+tlang_opt_f64 tl_f_c(tlang_fiber* __fib) {
+    return (tlang_opt_f64){0};
+}
+
+tl_User* tl_f_d(tlang_fiber* __fib) {
+    return NULL;
+}
+
+tlang_error tl_f_e(tlang_fiber* __fib) {
+    return (tlang_error){0};
+}
+
+bool tl_f_f(tlang_fiber* __fib) {
+    return false;
+}
+
+tlang_opt_i32 tl_f_g(tlang_fiber* __fib) {
+    return (tlang_opt_i32){0};
+}
+
+tlang_slice_i64* tl_f_h(tlang_fiber* __fib) {
+    return NULL;
+}
+
+tlang_string tl_f_i(tlang_fiber* __fib) {
+    return (tlang_string){0};
+}
+
+tl_User* tl_f_j(tlang_fiber* __fib) {
+    return NULL;
+}
+
+void tl_f_v(tlang_fiber* __fib) {
+    return;
+}
+
+void tl_f_params(tlang_fiber* __fib, int32_t l_n, tlang_opt_i64 l_m, tlang_string l_s, tl_User* l_u, tlang_slice_i64* l_xs, tlang_ctx* l_ctx, tlang_opt_bool l_flag) {
+}
+
+int64_t tl_m_User__twice(tlang_fiber* __fib, tl_User* l_u) {
+    return 0;
+}
+
+void tl_m_Context__handle(tlang_fiber* __fib, tlang_ctx* l_c) {
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

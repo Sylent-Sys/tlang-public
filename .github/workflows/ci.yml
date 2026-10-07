@@ -1,0 +1,186 @@
+name: CI
+
+# Fast checks (Go on Linux + Windows, the VS Code extension) run on every PR.
+# The full tlang-dev container matrix runs on pushes to main, on manual
+# dispatch, and when release.yml calls this workflow (inputs.full).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      full:
+        description: Run the full tlang-dev container matrix.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # The "ci-" prefix keeps this group distinct from a calling workflow's group.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          # No go.sum (stdlib only), so key the cache on go.mod.
+          cache-dependency-path: go.mod
+      - name: go build
+        run: go build ./...
+      - name: go vet
+        run: go vet ./...
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::gofmt -l reports unformatted files:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: go test (Linux)
+        if: runner.os == 'Linux'
+        run: go test -count=1 ./...
+      - name: go test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # The Windows image puts mingw gcc and LLVM clang on PATH. Hide them:
+          # TestRealToolchainBuildEndToEnd runs whenever gcc/clang is found and
+          # would try to build the Linux-only C runtime here.
+          $env:PATH = ($env:PATH -split ';' | Where-Object {
+              $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'gcc.exe')) -and
+              -not (Test-Path -LiteralPath (Join-Path $_ 'clang.exe'))
+            }) -join ';'
+          go test -count=1 ./...
+
+  extension:
+    name: VS Code extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - name: npm ci
+        run: npm ci
+      - name: npm run compile
+        run: npm run compile
+      - name: Extension LICENSE matches the root LICENSE
+        run: cmp ../../LICENSE LICENSE
+
+  full:
+    name: Full matrix (tlang-dev container)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || inputs.full == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:17@sha256:ae69c452f483507a6b99fb654cf93aad7fe156ffd2c56247707eef4e36d3c12b
+        env:
+          # Throwaway credentials for a disposable CI-only database.
+          POSTGRES_USER: tlang
+          POSTGRES_PASSWORD: tlang
+          POSTGRES_DB: tlang_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tlang -d tlang_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TLANG_TEST_DATABASE_URL: postgresql://tlang:tlang@127.0.0.1:5432/tlang_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the tlang-dev image
+        timeout-minutes: 40
+        run: docker build -t tlang-dev:latest docker/
+      - name: Install the container wrapper
+        # Same mounts and sanitizer options as scripts/dev.sh, plus host
+        # networking so the container reaches the postgres service, and the
+        # database URL passed through.
+        run: |
+          mkdir -p "$RUNNER_TEMP/go-build" "$RUNNER_TEMP/bin"
+          cat > "$RUNNER_TEMP/bin/dev" <<EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec docker run --rm --network host \\
+            -v "$GITHUB_WORKSPACE:/src" \\
+            -v "$GITHUB_WORKSPACE/.asan-diagnostics:/tmp/tlang-asan" \\
+            -e TLANG_KEEP_ASAN_BINARIES=1 \\
+            -e TLANG_ASAN_ARTIFACT_DIR=/src/.asan-diagnostics \\
+            -v "$RUNNER_TEMP/go-build:/root/.cache/go-build" \\
+            -w /src \\
+            --cap-add SYS_PTRACE --security-opt seccomp=unconfined \\
+            --ulimit nofile=65536:65536 \\
+            -e TLANG_TEST_DATABASE_URL \\
+            tlang-dev:latest bash -c "\$1"
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/dev"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Go front-end + ccompile golden matrix
+        timeout-minutes: 30
+        run: dev 'go test ./... -count=1 && go test -tags ccompile ./tests/...'
+      - name: Runtime matrix - gcc (PG=1)
+        timeout-minutes: 15
+        run: dev 'make -C runtime clean && make -C runtime test CC=gcc'
+      - name: Runtime matrix - clang (PG=1)
+        timeout-minutes: 15
+        run: dev 'make -C runtime clean && make -C runtime test CC=clang'
+      - name: Runtime matrix - tcc (PG=1)
+        timeout-minutes: 15
+        run: dev 'make -C runtime clean && make -C runtime test CC=tcc'
+      - name: Runtime matrix - gcc SAN=1
+        timeout-minutes: 20
+        run: dev 'make -C runtime clean && make -C runtime test CC=gcc SAN=1'
+      - name: Runtime matrix - clang PG=0
+        timeout-minutes: 15
+        run: dev 'make -C runtime clean && make -C runtime test CC=clang PG=0'
+      - name: End-to-end suite (with PostgreSQL 17)
+        timeout-minutes: 30
+        run: dev 'go test -tags e2e ./tests/... -count=1'
+      - name: Collect ASan diagnostics
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/tlang-asan-diagnostics"
+          docker run --rm -v "$GITHUB_WORKSPACE/.asan-diagnostics:/diag" -v "$RUNNER_TEMP/tlang-asan-diagnostics:/out" tlang-dev:latest bash -c 'chmod -R a+rX /diag 2>/dev/null || true; cp -a /diag/. /out/ 2>/dev/null || true'
+          find "$RUNNER_TEMP/tlang-asan-diagnostics" -type f -name 'asan.*' -size 0 -delete 2>/dev/null || true
+          find "$RUNNER_TEMP/tlang-asan-diagnostics" -type f -printf '%p %s bytes\n' || true
+      - name: Upload ASan diagnostics and failing binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: asan-diagnostics-${{ github.run_id }}
+          path: ${{ runner.temp }}/tlang-asan-diagnostics/
+          if-no-files-found: warn
+          retention-days: 14

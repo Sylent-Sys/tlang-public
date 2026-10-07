@@ -1,0 +1,85 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_User tl_User;
+
+struct tl_User {
+    int64_t f_id;
+};
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+tl_User* tl_f_mk(tlang_fiber* __fib, tl_User* l_u);
+int64_t tl_m_User__plus(tlang_fiber* __fib, tl_User* l_u, int64_t l_n);
+int64_t tl_m_Context__helper(tlang_fiber* __fib, tlang_ctx* l_ctx, int64_t l_n);
+int64_t tl_f_calls(tlang_fiber* __fib, tl_User* l_u, int64_t l_n);
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t __t1 = tlang_div_i64(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+tl_User* tl_f_mk(tlang_fiber* __fib, tl_User* l_u) {
+    return l_u;
+}
+
+int64_t tl_m_User__plus(tlang_fiber* __fib, tl_User* l_u, int64_t l_n) {
+    return tlang_add_i64(l_n, 1);
+}
+
+int64_t tl_m_Context__helper(tlang_fiber* __fib, tlang_ctx* l_ctx, int64_t l_n) {
+    return l_n;
+}
+
+int64_t tl_f_calls(tlang_fiber* __fib, tl_User* l_u, int64_t l_n) {
+    int64_t l_a;
+    int64_t l_b;
+    int64_t l_c;
+    int64_t __t1 = tl_m_User__plus(__fib, l_u, l_n);
+    if (__fib->err) goto __fail;
+    l_a = __t1;
+    tl_User* __t2 = tl_f_mk(__fib, l_u);
+    if (__fib->err) goto __fail;
+    int64_t __t3 = tl_f_div(__fib, l_n, 2);
+    if (__fib->err) goto __fail;
+    int64_t __t4 = tl_m_User__plus(__fib, __t2, __t3);
+    if (__fib->err) goto __fail;
+    l_b = __t4;
+    int64_t __t5 = tl_f_div(__fib, l_n, 3);
+    if (__fib->err) goto __fail;
+    int64_t __t6 = tl_m_User__plus(__fib, l_u, __t5);
+    if (__fib->err) goto __fail;
+    l_c = __t6;
+    return tlang_add_i64(tlang_add_i64(l_a, l_b), l_c);
+    __fail: ;
+    return 0;
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    int64_t l_n;
+    int64_t __t1 = tl_m_Context__helper(__fib, l_ctx, 1);
+    if (__fib->err) goto __fail;
+    l_n = __t1;
+    (void)l_n;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

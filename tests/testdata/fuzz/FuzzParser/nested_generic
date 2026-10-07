@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("fn f(): void { let x: Box<Box<Box<Box<Box<int64>>>>>; }")

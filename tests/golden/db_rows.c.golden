@@ -1,0 +1,155 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_User tl_User;
+typedef struct tl_Marker tl_Marker;
+typedef struct tl_Unused tl_Unused;
+typedef struct tl_Row__i64 tl_Row__i64;
+TLANG_SLICE_DEFINE(Marker, tl_Marker*)
+TLANG_SLICE_DEFINE(User, tl_User*)
+TLANG_SLICE_DEFINE(Row__i64, tl_Row__i64*)
+
+struct tl_User {
+    int64_t f_id;
+    tlang_string f_name;
+    tlang_string f_email;
+    tlang_opt_i32 f_age;
+    double f_score;
+    tlang_opt_f64 f_ratio;
+    bool f_active;
+    tlang_opt_bool f_verified;
+    int32_t f_small;
+    tlang_opt_i64 f_big;
+};
+
+struct tl_Marker {
+    char __empty;
+};
+
+struct tl_Unused {
+    int64_t f_id;
+};
+
+struct tl_Row__i64 {
+    int64_t f_v;
+};
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+
+static const tlang_type_desc __tl_td_Marker = { TLANG_STR_INIT("Marker"), sizeof(tl_Marker), 0, NULL, NULL };
+
+static const tlang_field_desc __tl_fd_User[10] = {
+    { TLANG_STR_INIT("id"), TLANG_KIND_I64, offsetof(tl_User, f_id) },
+    { TLANG_STR_INIT("name"), TLANG_KIND_STR, offsetof(tl_User, f_name) },
+    { TLANG_STR_INIT("email"), TLANG_KIND_OPT_STR, offsetof(tl_User, f_email) },
+    { TLANG_STR_INIT("age"), TLANG_KIND_OPT_I32, offsetof(tl_User, f_age) },
+    { TLANG_STR_INIT("score"), TLANG_KIND_F64, offsetof(tl_User, f_score) },
+    { TLANG_STR_INIT("ratio"), TLANG_KIND_OPT_F64, offsetof(tl_User, f_ratio) },
+    { TLANG_STR_INIT("active"), TLANG_KIND_BOOL, offsetof(tl_User, f_active) },
+    { TLANG_STR_INIT("verified"), TLANG_KIND_OPT_BOOL, offsetof(tl_User, f_verified) },
+    { TLANG_STR_INIT("small"), TLANG_KIND_I32, offsetof(tl_User, f_small) },
+    { TLANG_STR_INIT("big"), TLANG_KIND_OPT_I64, offsetof(tl_User, f_big) }
+};
+static const tlang_type_desc __tl_td_User = { TLANG_STR_INIT("User"), sizeof(tl_User), 10, __tl_fd_User, NULL };
+
+static const tlang_field_desc __tl_fd_Row__i64[1] = {
+    { TLANG_STR_INIT("v"), TLANG_KIND_I64, offsetof(tl_Row__i64, f_v) }
+};
+static const tlang_type_desc __tl_td_Row__i64 = { TLANG_STR_INIT("Row"), sizeof(tl_Row__i64), 1, __tl_fd_Row__i64, NULL };
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tlang_slice_Marker* l_marks;
+    int64_t l_id;
+    tlang_string l_name;
+    tlang_string l_email;
+    tlang_opt_i32 l_age;
+    int64_t l_n;
+    int64_t l_n0;
+    tlang_slice_User* l_all;
+    tl_User* l_one;
+    int64_t l_opt;
+    tlang_slice_Row__i64* l_typed;
+    tlang_slice_Marker* __t1 = (tlang_slice_Marker*)tlang_db_query(__fib, NULL, TLANG_STR("SELECT 1"), NULL, 0, &__tl_td_Marker);
+    if (__fib->err) goto __fail;
+    l_marks = __t1;
+    (void)l_marks;
+    l_id = 1;
+    l_name = TLANG_STR("n");
+    l_email = TLANG_STR_NULL;
+    l_age = TLANG_SOME(i32, 30);
+    int64_t __t2 = tlang_db_execute(__fib, NULL, TLANG_STR("UPDATE users SET name = $1 WHERE id = $2"), (tlang_pg_param[2]){ TLANG_PG_STR(l_name), TLANG_PG_I64(l_id) }, 2);
+    if (__fib->err) goto __fail;
+    l_n = __t2;
+    int64_t __t3 = tlang_db_execute(__fib, NULL, TLANG_STR("DELETE FROM users"), NULL, 0);
+    if (__fib->err) goto __fail;
+    l_n0 = __t3;
+    (void)l_n0;
+    tlang_slice_User* __t4 = (tlang_slice_User*)tlang_db_query(__fib, NULL, TLANG_STR("SELECT * FROM users"), NULL, 0, &__tl_td_User);
+    if (__fib->err) goto __fail;
+    l_all = __t4;
+    (void)l_all;
+    tl_User* __t5 = (tl_User*)tlang_db_query_one(__fib, NULL, TLANG_STR("SELECT * FROM users WHERE id = $1"), (tlang_pg_param[1]){ TLANG_PG_I64(l_id) }, 1, &__tl_td_User);
+    if (__fib->err) goto __fail;
+    l_one = __t5;
+    int64_t __t6 = tlang_ctx_param_int(__fib, l_ctx, TLANG_STR("id"));
+    if (__fib->err) goto __fail;
+    int64_t __t7 = tlang_db_execute(__fib, NULL, TLANG_STR("UPDATE users SET email = $1, age = $2 WHERE id = $3"), (tlang_pg_param[3]){ TLANG_PG_OPT_STR(l_email), TLANG_PG_OPT_I32(l_age), TLANG_PG_I64(__t6) }, 3);
+    if (__fib->err) goto __fail;
+    l_opt = __t7;
+    (void)l_opt;
+    tlang_slice_Row__i64* __t8 = (tlang_slice_Row__i64*)tlang_db_query(__fib, NULL, TLANG_STR("SELECT 1 AS v"), NULL, 0, &__tl_td_Row__i64);
+    if (__fib->err) goto __fail;
+    l_typed = __t8;
+    (void)l_typed;
+    {
+        tlang_tx* l_tx;
+        int64_t l_k;
+        tlang_slice_User* l_us;
+        tl_User* l_u1;
+        TxContext __tx_1;
+        if (!tlang_tx_begin(__fib, &__tx_1)) goto __tx_fail_1;
+        l_tx = &__tx_1;
+        int64_t __t9 = tlang_tx_exec(__fib, l_tx, TLANG_STR("UPDATE users SET active = $1, score = $2"), (tlang_pg_param[2]){ TLANG_PG_BOOL(true), TLANG_PG_F64(2.5) }, 2);
+        if (__fib->err) goto __tx_rollback_1;
+        l_k = __t9;
+        (void)l_k;
+        tlang_slice_User* __t10 = (tlang_slice_User*)tlang_tx_query(__fib, l_tx, TLANG_STR("SELECT * FROM users WHERE small = $1"), (tlang_pg_param[1]){ TLANG_PG_I32(3) }, 1, &__tl_td_User);
+        if (__fib->err) goto __tx_rollback_1;
+        l_us = __t10;
+        (void)l_us;
+        tl_User* __t11 = (tl_User*)tlang_tx_query_one(__fib, l_tx, TLANG_STR("SELECT * FROM users LIMIT 1"), NULL, 0, &__tl_td_User);
+        if (__fib->err) goto __tx_rollback_1;
+        l_u1 = __t11;
+        (void)l_u1;
+        if (!tlang_tx_commit(__fib, &__tx_1)) goto __tx_rollback_1;
+        goto __tx_end_1;
+        __tx_rollback_1: ;
+        tlang_tx_rollback(__fib, &__tx_1);
+        __tx_fail_1: ;
+        goto __fail;
+        __tx_end_1: ;
+    }
+    if (l_one != NULL) {
+        tlang_ctx_text(__fib, l_ctx, 200, l_one->f_name);
+        return;
+    }
+    tlang_ctx_text(__fib, l_ctx, 200, tlang_i64_to_string(__fib, l_n));
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = true,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

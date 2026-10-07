@@ -1,0 +1,2 @@
+a.ts:5:19: note: previous declaration of method `greet`
+main.ts:3:19: error: method `greet` redeclared on Context

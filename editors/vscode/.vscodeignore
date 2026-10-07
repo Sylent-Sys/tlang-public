@@ -1,0 +1,12 @@
+# Allowlist: ship only what the extension needs at runtime. vsce itself limits
+# node_modules to the production dependency tree (vscode-languageclient and its
+# dependencies), so the dev tools never reach the package.
+**
+!out/**
+!syntaxes/**
+!language-configuration.json
+!package.json
+!README.md
+!LICENSE
+!bin/**
+!node_modules/**

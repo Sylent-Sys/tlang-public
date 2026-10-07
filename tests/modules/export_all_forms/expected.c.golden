@@ -1,0 +1,97 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_models_ts_1qzdgw6__User tl_models_ts_1qzdgw6__User;
+
+struct tl_models_ts_1qzdgw6__User {
+    int64_t f_id;
+    tlang_string f_name;
+};
+
+struct tl_globals {
+    int64_t g_models_ts_1qzdgw6__seed;
+};
+
+tlang_string tl_f_models_ts_1qzdgw6__greet(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u);
+tlang_string tl_m_models_ts_1qzdgw6__User__label(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u);
+bool tl_f_models_ts_1qzdgw6__allow(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_m_Context__ping(tlang_fiber* __fib, tlang_ctx* l_ctx);
+int64_t tl_f_main_ts_1cmw5wz__run(tlang_fiber* __fib);
+void tl_f_main_ts_1cmw5wz__route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+int64_t tl_f_models_ts_1qzdgw6__identity__i64(tlang_fiber* __fib, int64_t l_x);
+
+tlang_string tl_f_models_ts_1qzdgw6__greet(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u) {
+    return l_u->f_name;
+}
+
+tlang_string tl_m_models_ts_1qzdgw6__User__label(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u) {
+    return l_u->f_name;
+}
+
+bool tl_f_models_ts_1qzdgw6__allow(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    return true;
+}
+
+void tl_m_Context__ping(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    if (!tl_f_models_ts_1qzdgw6__allow(__fib, l_ctx)) goto __guard_denied;
+    tlang_ctx_text(__fib, l_ctx, 200, TLANG_STR("ok"));
+    return;
+    __guard_denied: ;
+    if (!l_ctx->response_sent) tlang_ctx_text(__fib, l_ctx, 403, TLANG_STR("Forbidden"));
+    return;
+}
+
+int64_t tl_f_main_ts_1cmw5wz__run(tlang_fiber* __fib) {
+    tl_models_ts_1qzdgw6__User* l_u;
+    tlang_string l_who;
+    int64_t l_n;
+    tlang_string l_m;
+    l_u = (tl_models_ts_1qzdgw6__User*)tlang_alloc_zeroed(__fib, sizeof(tl_models_ts_1qzdgw6__User));
+    l_u->f_id = __fib->globals->g_models_ts_1qzdgw6__seed;
+    l_u->f_name = TLANG_STR("ada");
+    tlang_string __t1 = tl_f_models_ts_1qzdgw6__greet(__fib, l_u);
+    if (__fib->err) goto __fail;
+    l_who = __t1;
+    (void)l_who;
+    int64_t __t2 = tl_f_models_ts_1qzdgw6__identity__i64(__fib, l_u->f_id);
+    if (__fib->err) goto __fail;
+    l_n = __t2;
+    tlang_string __t3 = tl_m_models_ts_1qzdgw6__User__label(__fib, l_u);
+    if (__fib->err) goto __fail;
+    l_m = __t3;
+    (void)l_m;
+    return l_n;
+    __fail: ;
+    return 0;
+}
+
+void tl_f_main_ts_1cmw5wz__route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tl_m_Context__ping(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    return;
+    __fail: ;
+    return;
+}
+
+int64_t tl_f_models_ts_1qzdgw6__identity__i64(tlang_fiber* __fib, int64_t l_x) {
+    return l_x;
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    __fib->globals->g_models_ts_1qzdgw6__seed = 7;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = tl_f_main_ts_1cmw5wz__route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

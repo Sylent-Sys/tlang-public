@@ -1,0 +1,2 @@
+a.ts:3:10: note: first export of `X` here
+a.ts:5:1: error: duplicate export `X`

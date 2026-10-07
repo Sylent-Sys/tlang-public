@@ -1,0 +1,71 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_shadow(tlang_fiber* __fib, int64_t l_x, bool l_c);
+void tl_f_paramSetOnly(tlang_fiber* __fib, int64_t l_p, tlang_string l_q);
+
+int64_t tl_f_shadow(tlang_fiber* __fib, int64_t l_x, bool l_c) {
+    int64_t l_total;
+    int64_t l_unused;
+    int64_t l_setOnly;
+    int64_t l_z;
+    tlang_string l_s;
+    tlang_opt_f64 l_o;
+    l_total = l_x;
+    {
+        int64_t l_x__2;
+        l_x__2 = 5;
+        l_total = tlang_add_i64(l_total, l_x__2);
+    }
+    if (l_c) {
+        int64_t l_x__2;
+        l_x__2 = 7;
+        l_total = tlang_add_i64(l_total, l_x__2);
+    } else {
+        int64_t l_x__2;
+        l_x__2 = 9;
+        l_total = tlang_add_i64(l_total, l_x__2);
+    }
+    {
+        int64_t l_y;
+        l_y = l_total;
+        {
+            int64_t l_y__2;
+            l_y__2 = tlang_add_i64(l_y, 1);
+            l_total = l_y__2;
+        }
+    }
+    l_unused = 5;
+    (void)l_unused;
+    l_setOnly = 1;
+    (void)l_setOnly;
+    l_setOnly = 2;
+    l_z = 0;
+    l_s = (tlang_string){0};
+    (void)l_s;
+    l_o = (tlang_opt_f64){0};
+    (void)l_o;
+    return tlang_add_i64(l_total, l_z);
+}
+
+void tl_f_paramSetOnly(tlang_fiber* __fib, int64_t l_p, tlang_string l_q) {
+    (void)l_p;
+    (void)l_q;
+    l_p = 5;
+    l_q = TLANG_STR("x");
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

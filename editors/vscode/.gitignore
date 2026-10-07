@@ -1,0 +1,5 @@
+node_modules/
+out/
+# The bundled tlang-lsp, copied in only when packaging a platform .vsix.
+bin/
+*.vsix

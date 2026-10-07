@@ -1,0 +1,120 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+int64_t tl_f_safe(tlang_fiber* __fib, int64_t l_a);
+int64_t tl_f_chain(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+bool tl_f_andOr(tlang_fiber* __fib, bool l_ok, int64_t l_a, int64_t l_b);
+int64_t tl_f_loopCond(tlang_fiber* __fib, int64_t l_n, int64_t l_d);
+void tl_f_voidCalls(tlang_fiber* __fib, int64_t l_a);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t __t1 = tlang_div_i64(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int64_t tl_f_safe(tlang_fiber* __fib, int64_t l_a) {
+    return tlang_add_i64(l_a, 1);
+}
+
+int64_t tl_f_chain(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t l_q;
+    int64_t l_r;
+    int64_t __t1 = tl_f_div(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    l_q = __t1;
+    int64_t __t2 = tl_f_div(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    int64_t __t3 = tl_f_safe(__fib, l_q);
+    if (__fib->err) goto __fail;
+    int64_t __t4 = tl_f_div(__fib, __t2, __t3);
+    if (__fib->err) goto __fail;
+    l_r = __t4;
+    return tlang_add_i64(l_q, l_r);
+    __fail: ;
+    return 0;
+}
+
+bool tl_f_andOr(tlang_fiber* __fib, bool l_ok, int64_t l_a, int64_t l_b) {
+    bool l_x;
+    bool l_y;
+    bool l_z;
+    bool __t1 = false;
+    if (l_ok) {
+        int64_t __t2 = tl_f_div(__fib, l_a, l_b);
+        if (__fib->err) goto __fail;
+        __t1 = __t2 > 0;
+    }
+    l_x = __t1;
+    bool __t3 = true;
+    if (!l_ok) {
+        int64_t __t4 = tl_f_div(__fib, l_a, l_b);
+        if (__fib->err) goto __fail;
+        __t3 = __t4 > 0;
+    }
+    l_y = __t3;
+    int64_t __t5 = tl_f_div(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    l_z = (__t5 > 0) && l_ok;
+    return (l_x && l_y) || l_z;
+    __fail: ;
+    return false;
+}
+
+int64_t tl_f_loopCond(tlang_fiber* __fib, int64_t l_n, int64_t l_d) {
+    int64_t l_count;
+    int64_t l_i;
+    l_count = 0;
+    l_i = l_n;
+    for (;;) {
+        int64_t __t1 = tl_f_div(__fib, l_i, l_d);
+        if (__fib->err) goto __fail;
+        if (!(__t1 > 0)) break;
+        l_i = tlang_sub_i64(l_i, l_d);
+        l_count = tlang_add_i64(l_count, 1);
+    }
+    return l_count;
+    __fail: ;
+    return 0;
+}
+
+void tl_f_voidCalls(tlang_fiber* __fib, int64_t l_a) {
+    (void)tl_f_div(__fib, l_a, l_a);
+    if (__fib->err) goto __fail;
+    (void)tl_f_safe(__fib, l_a);
+    if (__fib->err) goto __fail;
+    return;
+    __fail: ;
+    return;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    int64_t l_x;
+    int64_t __t1 = tl_f_chain(__fib, 10, 2);
+    if (__fib->err) goto __fail;
+    l_x = __t1;
+    tl_f_voidCalls(__fib, l_x);
+    if (__fib->err) goto __fail;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

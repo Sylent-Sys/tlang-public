@@ -1,0 +1,44 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_User tl_User;
+
+struct tl_User {
+    int64_t f_id;
+};
+
+bool tl_f_selfOps(tlang_fiber* __fib, int64_t l_x, double l_f, bool l_b, tl_User* l_u);
+
+bool tl_f_selfOps(tlang_fiber* __fib, int64_t l_x, double l_f, bool l_b, tl_User* l_u) {
+    bool l_same;
+    bool l_fsame;
+    bool l_bsame;
+    bool l_usame;
+    bool l_overlap;
+    bool l_never;
+    l_same = (int64_t)l_x == l_x;
+    l_fsame = (double)l_f == l_f;
+    l_bsame = (bool)l_b != l_b;
+    l_usame = (tl_User*)l_u == l_u;
+    l_x = (int64_t)l_x;
+    l_f = (double)l_f;
+    l_b = (bool)l_b;
+    l_overlap = (l_x > 5) || (l_x < 10);
+    l_never = (l_x < 5) && (l_x > 10);
+    return ((((l_same && l_fsame) && l_bsame) && l_usame) && l_overlap) && l_never;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

@@ -1,0 +1,53 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+struct tl_globals {
+    int64_t g_lib_ts_1jnw2gv__base;
+};
+
+int64_t tl_f_lib_ts_1jnw2gv__run(tlang_fiber* __fib);
+int64_t tl_f_lib_ts_1jnw2gv__step(tlang_fiber* __fib, int64_t l_n);
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib);
+
+int64_t tl_f_lib_ts_1jnw2gv__run(tlang_fiber* __fib) {
+    return 1;
+}
+
+int64_t tl_f_lib_ts_1jnw2gv__step(tlang_fiber* __fib, int64_t l_n) {
+    return tlang_add_i64(l_n, 1);
+}
+
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib) {
+    int64_t l_a;
+    int64_t l_b;
+    int64_t __t1 = tl_f_lib_ts_1jnw2gv__run(__fib);
+    if (__fib->err) goto __fail;
+    l_a = __t1;
+    (void)l_a;
+    int64_t __t2 = tl_f_lib_ts_1jnw2gv__step(__fib, __fib->globals->g_lib_ts_1jnw2gv__base);
+    if (__fib->err) goto __fail;
+    l_b = __t2;
+    (void)l_b;
+    return;
+    __fail: ;
+    return;
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    __fib->globals->g_lib_ts_1jnw2gv__base = 10;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main_ts_1cmw5wz__main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

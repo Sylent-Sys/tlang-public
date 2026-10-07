@@ -1,0 +1,72 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+struct tl_globals {
+    int64_t g_counter;
+};
+
+int64_t tl_f_bump(tlang_fiber* __fib);
+int64_t tl_f_pair(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+int64_t tl_f_order(tlang_fiber* __fib);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_bump(tlang_fiber* __fib) {
+    __fib->globals->g_counter = tlang_add_i64(__fib->globals->g_counter, 1);
+    return __fib->globals->g_counter;
+}
+
+int64_t tl_f_pair(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    return tlang_add_i64(tlang_mul_i64(l_a, 10), l_b);
+}
+
+int64_t tl_f_order(tlang_fiber* __fib) {
+    int64_t l_x;
+    int64_t l_y;
+    int64_t l_z;
+    int64_t __t1 = __fib->globals->g_counter;
+    int64_t __t2 = tl_f_bump(__fib);
+    if (__fib->err) goto __fail;
+    int64_t __t3 = tl_f_pair(__fib, __t1, __t2);
+    if (__fib->err) goto __fail;
+    l_x = __t3;
+    int64_t __t4 = __fib->globals->g_counter;
+    int64_t __t5 = tl_f_bump(__fib);
+    if (__fib->err) goto __fail;
+    l_y = tlang_add_i64(__t4, __t5);
+    int64_t __t6 = tl_f_bump(__fib);
+    if (__fib->err) goto __fail;
+    l_z = tlang_add_i64(__t6, __fib->globals->g_counter);
+    return tlang_add_i64(tlang_add_i64(l_x, l_y), l_z);
+    __fail: ;
+    return 0;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    int64_t l_r;
+    int64_t __t1 = tl_f_order(__fib);
+    if (__fib->err) goto __fail;
+    l_r = __t1;
+    (void)l_r;
+    return;
+    __fail: ;
+    return;
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    __fib->globals->g_counter = 0;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

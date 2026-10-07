@@ -1,0 +1,92 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+bool tl_f_allow(tlang_fiber* __fib, tlang_ctx* l_ctx);
+bool tl_f_risky(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_m_Context__guarded(tlang_fiber* __fib, tlang_ctx* l_ctx);
+int64_t tl_f_count(tlang_fiber* __fib, tlang_ctx* l_c, int64_t l_base);
+tlang_string tl_m_Context__value(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+
+bool tl_f_allow(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    return true;
+}
+
+bool tl_f_risky(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    int64_t l_d;
+    l_d = 0;
+    int64_t __t1 = tlang_div_i64(__fib, 10, l_d);
+    if (__fib->err) goto __fail;
+    return __t1 > 0;
+    __fail: ;
+    return false;
+}
+
+void tl_m_Context__guarded(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    int64_t l_n;
+    if (!tl_f_allow(__fib, l_ctx)) goto __guard_denied;
+    bool __t1 = tl_f_risky(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    if (!__t1) goto __guard_denied;
+    l_n = 1;
+    (void)l_n;
+    return;
+    __fail: ;
+    return;
+    __guard_denied: ;
+    if (!l_ctx->response_sent) tlang_ctx_text(__fib, l_ctx, 403, TLANG_STR("Forbidden"));
+    return;
+}
+
+int64_t tl_f_count(tlang_fiber* __fib, tlang_ctx* l_c, int64_t l_base) {
+    if (!tl_f_allow(__fib, l_c)) goto __guard_denied;
+    return tlang_add_i64(l_base, 1);
+    __guard_denied: ;
+    if (!l_c->response_sent) tlang_ctx_text(__fib, l_c, 403, TLANG_STR("Forbidden"));
+    return 0;
+}
+
+tlang_string tl_m_Context__value(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    bool __t1 = tl_f_risky(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    if (!__t1) goto __guard_denied;
+    return TLANG_STR("v");
+    __fail: ;
+    return (tlang_string){0};
+    __guard_denied: ;
+    if (!l_ctx->response_sent) tlang_ctx_text(__fib, l_ctx, 403, TLANG_STR("Forbidden"));
+    return (tlang_string){0};
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    int64_t l_n;
+    tlang_string l_s;
+    tl_m_Context__guarded(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    int64_t __t1 = tl_f_count(__fib, l_ctx, 5);
+    if (__fib->err) goto __fail;
+    l_n = __t1;
+    (void)l_n;
+    tlang_string __t2 = tl_m_Context__value(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    l_s = __t2;
+    (void)l_s;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

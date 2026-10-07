@@ -1,0 +1,83 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Item tl_Item;
+typedef struct tl_Box__i64 tl_Box__i64;
+typedef struct tl_Box__Item tl_Box__Item;
+typedef struct tl_Pair__str__Box__Item tl_Pair__str__Box__Item;
+typedef struct tl_Holder tl_Holder;
+typedef struct tl_Pair__i32__bool tl_Pair__i32__bool;
+typedef struct tl_Box__opt_Item tl_Box__opt_Item;
+typedef struct tl_Box__str tl_Box__str;
+TLANG_SLICE_DEFINE(Item, tl_Item*)
+TLANG_SLICE_DEFINE(opt_Item, tl_Item*)
+
+struct tl_Item {
+    int64_t f_id;
+};
+
+struct tl_Box__i64 {
+    int64_t f_value;
+    tlang_slice_i64* f_items;
+};
+
+struct tl_Box__Item {
+    tl_Item* f_value;
+    tlang_slice_Item* f_items;
+};
+
+struct tl_Pair__str__Box__Item {
+    tlang_string f_first;
+    tl_Box__Item* f_second;
+};
+
+struct tl_Holder {
+    tl_Box__i64* f_b;
+    tl_Pair__str__Box__Item* f_p;
+};
+
+struct tl_Pair__i32__bool {
+    int32_t f_first;
+    bool f_second;
+};
+
+struct tl_Box__opt_Item {
+    tl_Item* f_value;
+    tlang_slice_opt_Item* f_items;
+};
+
+struct tl_Box__str {
+    tlang_string f_value;
+    tlang_slice_str* f_items;
+};
+
+struct tl_globals {
+    tl_Box__str* g_cache;
+};
+
+void tl_f_take(tlang_fiber* __fib, tl_Pair__i32__bool* l_p, tl_Box__opt_Item* l_q);
+void tl_f_main(tlang_fiber* __fib);
+
+void tl_f_take(tlang_fiber* __fib, tl_Pair__i32__bool* l_p, tl_Box__opt_Item* l_q) {
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

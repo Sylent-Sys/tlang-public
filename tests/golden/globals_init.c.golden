@@ -1,0 +1,67 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+struct tl_globals {
+    int64_t g_base;
+    int64_t g_derived;
+    int64_t g_fromCall;
+    int64_t g_guarded;
+    bool g_flag;
+    tlang_string g_greeting;
+    tlang_opt_i64 g_maybe;
+    tlang_string g_none;
+    tlang_string g_copy;
+};
+
+int64_t tl_f_compute(tlang_fiber* __fib, int64_t l_n);
+int64_t tl_f_risky(tlang_fiber* __fib, int64_t l_n);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_compute(tlang_fiber* __fib, int64_t l_n) {
+    return tlang_mul_i64(l_n, 2);
+}
+
+int64_t tl_f_risky(tlang_fiber* __fib, int64_t l_n) {
+    int64_t __t1 = tlang_div_i64(__fib, 100, l_n);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    __fib->globals->g_base = tlang_add_i64(__fib->globals->g_base, __fib->globals->g_derived);
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    __fib->globals->g_base = 10;
+    __fib->globals->g_derived = tlang_add_i64(tlang_mul_i64(__fib->globals->g_base, 3), 1);
+    int64_t __t1 = tl_f_compute(__fib, __fib->globals->g_base);
+    if (__fib->err) goto __fail;
+    __fib->globals->g_fromCall = __t1;
+    int64_t __t2 = tl_f_risky(__fib, __fib->globals->g_derived);
+    if (__fib->err) goto __fail;
+    __fib->globals->g_guarded = __t2;
+    __fib->globals->g_flag = (__fib->globals->g_derived > __fib->globals->g_base) && (__fib->globals->g_fromCall != 0);
+    __fib->globals->g_greeting = TLANG_STR("hi there");
+    __fib->globals->g_maybe = TLANG_SOME(i64, 5);
+    __fib->globals->g_none = TLANG_STR_NULL;
+    __fib->globals->g_copy = __fib->globals->g_greeting;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

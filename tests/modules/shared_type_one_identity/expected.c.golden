@@ -1,0 +1,55 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_shared_ts_1stl7if__User tl_shared_ts_1stl7if__User;
+
+struct tl_shared_ts_1stl7if__User {
+    int64_t f_id;
+    tlang_string f_name;
+};
+
+int64_t tl_f_consume_ts_5o5d1k__consume(tlang_fiber* __fib, tl_shared_ts_1stl7if__User* l_u);
+tl_shared_ts_1stl7if__User* tl_f_make_ts_1mwqb1e__make(tlang_fiber* __fib, int64_t l_id);
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib);
+
+int64_t tl_f_consume_ts_5o5d1k__consume(tlang_fiber* __fib, tl_shared_ts_1stl7if__User* l_u) {
+    return l_u->f_id;
+}
+
+tl_shared_ts_1stl7if__User* tl_f_make_ts_1mwqb1e__make(tlang_fiber* __fib, int64_t l_id) {
+    tl_shared_ts_1stl7if__User* l_u;
+    l_u = (tl_shared_ts_1stl7if__User*)tlang_alloc_zeroed(__fib, sizeof(tl_shared_ts_1stl7if__User));
+    l_u->f_id = l_id;
+    l_u->f_name = TLANG_STR("shared");
+    return l_u;
+}
+
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib) {
+    tl_shared_ts_1stl7if__User* l_u;
+    int64_t l_n;
+    tl_shared_ts_1stl7if__User* __t1 = tl_f_make_ts_1mwqb1e__make(__fib, 3);
+    if (__fib->err) goto __fail;
+    l_u = __t1;
+    int64_t __t2 = tl_f_consume_ts_5o5d1k__consume(__fib, l_u);
+    if (__fib->err) goto __fail;
+    l_n = __t2;
+    (void)l_n;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main_ts_1cmw5wz__main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

@@ -1,0 +1,294 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_C tl_C;
+typedef struct tl_A tl_A;
+typedef struct tl_B tl_B;
+typedef struct tl_N tl_N;
+TLANG_SLICE_DEFINE(N, tl_N*)
+
+struct tl_C {
+    int64_t f_v;
+};
+
+struct tl_A {
+    tl_C* f_c;
+};
+
+struct tl_B {
+    tl_A* f_a;
+};
+
+struct tl_N {
+    tlang_string f_name;
+    tlang_slice_N* f_kids;
+};
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+static bool tlj_parse_C(tlang_fiber* __fib, const char** __p, const char* __end, tl_C* __out, int __depth);
+static void tlj_write_C(tlang_fiber* __fib, tlang_buf* __b, tl_C* __v);
+static bool tlj_parse_A(tlang_fiber* __fib, const char** __p, const char* __end, tl_A* __out, int __depth);
+static void tlj_write_A(tlang_fiber* __fib, tlang_buf* __b, tl_A* __v);
+static bool tlj_parse_B(tlang_fiber* __fib, const char** __p, const char* __end, tl_B* __out, int __depth);
+static bool tlj_parse_arr_N(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_N** __out, int __depth);
+static void tlj_write_arr_N(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_N* __v);
+static bool tlj_parse_N(tlang_fiber* __fib, const char** __p, const char* __end, tl_N* __out, int __depth);
+static void tlj_write_N(tlang_fiber* __fib, tlang_buf* __b, tl_N* __v);
+
+static bool tlj_parse_C(tlang_fiber* __fib, const char** __p, const char* __end, tl_C* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 1 && memcmp(__key.data, "v", 1) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_v)) return false;
+            __seen |= UINT64_C(1) << 0;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x1)) == UINT64_C(0x1);
+}
+
+static void tlj_write_C(tlang_fiber* __fib, tlang_buf* __b, tl_C* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"v\":");
+    json_write_i64(__b, __v->f_v);
+    tlang_buf_putc(__b, '}');
+}
+
+static bool tlj_parse_A(tlang_fiber* __fib, const char** __p, const char* __end, tl_A* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 1 && memcmp(__key.data, "c", 1) == 0) {
+            tl_C* __o = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));
+            if (!tlj_parse_C(__fib, &__q, __end, __o, __depth + 1)) return false;
+            __out->f_c = __o;
+            __seen |= UINT64_C(1) << 0;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x1)) == UINT64_C(0x1);
+}
+
+static void tlj_write_A(tlang_fiber* __fib, tlang_buf* __b, tl_A* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"c\":");
+    tlj_write_C(__fib, __b, __v->f_c);
+    tlang_buf_putc(__b, '}');
+}
+
+static bool tlj_parse_B(tlang_fiber* __fib, const char** __p, const char* __end, tl_B* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 1 && memcmp(__key.data, "a", 1) == 0) {
+            tl_A* __o = (tl_A*)tlang_alloc_zeroed(__fib, sizeof(tl_A));
+            if (!tlj_parse_A(__fib, &__q, __end, __o, __depth + 1)) return false;
+            __out->f_a = __o;
+            __seen |= UINT64_C(1) << 0;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x1)) == UINT64_C(0x1);
+}
+
+static bool tlj_parse_arr_N(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_N** __out, int __depth) {
+    const char* __q = *__p;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '[') return false;
+    __q++;
+    tlang_slice_N* __s = TLANG_SLICE_NEW(__fib, N);
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == ']') { __q++; goto __done; }
+    for (;;) {
+        __q = json_skip_ws(__q, __end);
+        tl_N* __e;
+        tl_N* __o = (tl_N*)tlang_alloc_zeroed(__fib, sizeof(tl_N));
+        if (!tlj_parse_N(__fib, &__q, __end, __o, __depth + 1)) return false;
+        __e = __o;
+        TLANG_SLICE_PUSH(__fib, __s, __e);
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == ']') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__out = __s;
+    *__p = __q;
+    return true;
+}
+
+static void tlj_write_arr_N(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_N* __v) {
+    tlang_buf_putc(__b, '[');
+    for (int64_t __i = 0; __i < __v->len; __i++) {
+        if (__i > 0) tlang_buf_putc(__b, ',');
+        tl_N* __e = __v->items[__i];
+        tlj_write_N(__fib, __b, __e);
+    }
+    tlang_buf_putc(__b, ']');
+}
+
+static bool tlj_parse_N(tlang_fiber* __fib, const char** __p, const char* __end, tl_N* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 4 && memcmp(__key.data, "name", 4) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_name)) return false;
+            __seen |= UINT64_C(1) << 0;
+        } else if (__key.len == 4 && memcmp(__key.data, "kids", 4) == 0) {
+            tlang_slice_N* __a = NULL;
+            if (!tlj_parse_arr_N(__fib, &__q, __end, &__a, __depth + 1)) return false;
+            __out->f_kids = __a;
+            __seen |= UINT64_C(1) << 1;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x3)) == UINT64_C(0x3);
+}
+
+static void tlj_write_N(tlang_fiber* __fib, tlang_buf* __b, tl_N* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"name\":");
+    json_write_str(__b, __v->f_name);
+    TLANG_BUF_PUT_LIT(__b, ",\"kids\":");
+    tlj_write_arr_N(__fib, __b, __v->f_kids);
+    tlang_buf_putc(__b, '}');
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tl_A* l_a;
+    tl_B* l_b;
+    tl_N* l_n;
+    tl_A* __t1 = (tl_A*)tlang_alloc_zeroed(__fib, sizeof(tl_A));
+    __t1->f_c = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));
+    l_a = __t1;
+    {
+        tlang_buf __b2;
+        tlang_buf_init(__fib, &__b2, 256);
+        tlj_write_A(__fib, &__b2, l_a);
+        tlang_ctx_json(__fib, l_ctx, 200, tlang_buf_string(&__b2));
+    }
+    tl_B* __t3 = (tl_B*)tlang_alloc_zeroed(__fib, sizeof(tl_B));
+    tl_A* __t4 = (tl_A*)tlang_alloc_zeroed(__fib, sizeof(tl_A));
+    __t4->f_c = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));
+    __t3->f_a = __t4;
+    l_b = __t3;
+    const char* __jp5 = l_ctx->body.data;
+    const char* __je5 = __jp5 + l_ctx->body.len;
+    bool __t6 = tlj_parse_B(__fib, &__jp5, __je5, l_b, 0) && json_skip_ws(__jp5, __je5) == __je5;
+    if (__t6) {
+        tlang_ctx_text(__fib, l_ctx, 200, TLANG_STR("b"));
+    }
+    tl_N* __t7 = (tl_N*)tlang_alloc_zeroed(__fib, sizeof(tl_N));
+    __t7->f_kids = TLANG_SLICE_NEW(__fib, N);
+    l_n = __t7;
+    const char* __jp8 = l_ctx->body.data;
+    const char* __je8 = __jp8 + l_ctx->body.len;
+    bool __t9 = tlj_parse_N(__fib, &__jp8, __je8, l_n, 0) && json_skip_ws(__jp8, __je8) == __je8;
+    if (__t9) {
+        {
+            tlang_buf __b10;
+            tlang_buf_init(__fib, &__b10, 256);
+            tlj_write_N(__fib, &__b10, l_n);
+            tlang_ctx_json(__fib, l_ctx, 200, tlang_buf_string(&__b10));
+        }
+    }
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

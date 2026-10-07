@@ -1,0 +1,53 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+struct tl_globals {
+    int64_t g_base_ts_tvlsrn__counter;
+    int64_t g_derived_ts_1m5txwl__counter;
+    int64_t g_main_ts_1cmw5wz__total;
+};
+
+int64_t tl_f_base_ts_tvlsrn__baseValue(tlang_fiber* __fib);
+int64_t tl_f_derived_ts_1m5txwl__derivedValue(tlang_fiber* __fib);
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib);
+
+int64_t tl_f_base_ts_tvlsrn__baseValue(tlang_fiber* __fib) {
+    return __fib->globals->g_base_ts_tvlsrn__counter;
+}
+
+int64_t tl_f_derived_ts_1m5txwl__derivedValue(tlang_fiber* __fib) {
+    return __fib->globals->g_derived_ts_1m5txwl__counter;
+}
+
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib) {
+    __fib->globals->g_main_ts_1cmw5wz__total = tlang_add_i64(__fib->globals->g_main_ts_1cmw5wz__total, 1);
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    __fib->globals->g_base_ts_tvlsrn__counter = 1;
+    int64_t __t1 = tl_f_base_ts_tvlsrn__baseValue(__fib);
+    if (__fib->err) goto __fail;
+    __fib->globals->g_derived_ts_1m5txwl__counter = tlang_add_i64(__t1, 10);
+    int64_t __t2 = tl_f_base_ts_tvlsrn__baseValue(__fib);
+    if (__fib->err) goto __fail;
+    int64_t __t3 = tl_f_derived_ts_1m5txwl__derivedValue(__fib);
+    if (__fib->err) goto __fail;
+    __fib->globals->g_main_ts_1cmw5wz__total = tlang_add_i64(__t2, __t3);
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main_ts_1cmw5wz__main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

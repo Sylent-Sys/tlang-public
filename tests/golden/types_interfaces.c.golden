@@ -1,0 +1,61 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Empty tl_Empty;
+typedef struct tl_Address tl_Address;
+typedef struct tl_Point tl_Point;
+typedef struct tl_User tl_User;
+TLANG_SLICE_DEFINE(User, tl_User*)
+
+struct tl_Empty {
+    char __empty;
+};
+
+struct tl_Address {
+    tlang_string f_street;
+    int32_t f_zip;
+};
+
+struct tl_Point {
+    double f_x;
+    double f_y;
+};
+
+struct tl_User {
+    int64_t f_id;
+    tlang_string f_name;
+    tlang_string f_email;
+    tlang_opt_f64 f_score;
+    bool f_active;
+    tlang_opt_i32 f_age;
+    tlang_opt_bool f_flag;
+    tlang_opt_i64 f_big;
+    tl_Address* f_addr;
+    tl_Address* f_prev;
+    tlang_slice_str* f_tags;
+    tlang_slice_i64* f_nums;
+    tlang_slice_User* f_friends;
+    tlang_error f_last;
+    tl_Point* f_where;
+    tl_Empty* f_nothing;
+};
+
+void tl_f_main(tlang_fiber* __fib);
+
+void tl_f_main(tlang_fiber* __fib) {
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

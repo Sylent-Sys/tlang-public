@@ -1,0 +1,135 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_add(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+int32_t tl_f_mul32(tlang_fiber* __fib, int32_t l_a, int32_t l_b);
+int64_t tl_f_neg(tlang_fiber* __fib, int64_t l_a, int32_t l_b);
+int64_t tl_f_divVar(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+int32_t tl_f_modVar(tlang_fiber* __fib, int32_t l_a, int32_t l_b);
+int64_t tl_f_divConst(tlang_fiber* __fib, int64_t l_a);
+int64_t tl_f_divZero(tlang_fiber* __fib, int64_t l_a);
+int32_t tl_f_modZero(tlang_fiber* __fib, int32_t l_a);
+int64_t tl_f_constants(tlang_fiber* __fib);
+int32_t tl_f_constants32(tlang_fiber* __fib);
+int64_t tl_f_compound(tlang_fiber* __fib, int64_t l_x, int64_t l_d, int32_t l_y);
+
+int64_t tl_f_add(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    return tlang_sub_i64(tlang_add_i64(l_a, l_b), 1);
+}
+
+int32_t tl_f_mul32(tlang_fiber* __fib, int32_t l_a, int32_t l_b) {
+    return tlang_mul_i32(l_a, l_b);
+}
+
+int64_t tl_f_neg(tlang_fiber* __fib, int64_t l_a, int32_t l_b) {
+    int32_t l_c;
+    l_c = tlang_neg_i32(l_b);
+    return tlang_add_i64(tlang_neg_i64(l_a), (int64_t)l_c);
+}
+
+int64_t tl_f_divVar(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t __t1 = tlang_div_i64(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int32_t tl_f_modVar(tlang_fiber* __fib, int32_t l_a, int32_t l_b) {
+    int32_t __t1 = tlang_mod_i32(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int64_t tl_f_divConst(tlang_fiber* __fib, int64_t l_a) {
+    return tlang_add_i64(tlang_div_i64(__fib, l_a, 7), tlang_mod_i64(__fib, l_a, -1));
+}
+
+int64_t tl_f_divZero(tlang_fiber* __fib, int64_t l_a) {
+    int64_t __t1 = tlang_div_i64(__fib, l_a, 0);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int32_t tl_f_modZero(tlang_fiber* __fib, int32_t l_a) {
+    int32_t __t1 = tlang_mod_i32(__fib, l_a, 0);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int64_t tl_f_constants(tlang_fiber* __fib) {
+    int64_t l_maxv;
+    int64_t l_minv;
+    int64_t l_minv2;
+    int64_t l_wrapped;
+    int64_t l_big;
+    int64_t l_allOnes;
+    int64_t l_hex;
+    int64_t l_under;
+    int64_t l_folded;
+    l_maxv = 9223372036854775807;
+    l_minv = INT64_MIN;
+    l_minv2 = INT64_MIN;
+    l_wrapped = tlang_add_i64(9223372036854775807, 1);
+    l_big = INT64_MIN;
+    l_allOnes = -1;
+    l_hex = 255;
+    l_under = 1000000;
+    l_folded = 10;
+    return tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(l_maxv, l_minv), l_minv2), l_wrapped), l_big), l_allOnes), l_hex), l_under), l_folded);
+}
+
+int32_t tl_f_constants32(tlang_fiber* __fib) {
+    int32_t l_a;
+    int32_t l_b;
+    int32_t l_c;
+    l_a = INT32_MIN;
+    l_b = 2147483647;
+    l_c = tlang_mul_i32(5, 1000000000);
+    return tlang_add_i32(tlang_add_i32(l_a, l_b), l_c);
+}
+
+int64_t tl_f_compound(tlang_fiber* __fib, int64_t l_x, int64_t l_d, int32_t l_y) {
+    l_x = tlang_add_i64(l_x, 3);
+    l_x = tlang_sub_i64(l_x, 4);
+    l_x = tlang_mul_i64(l_x, 5);
+    int64_t __t1 = tlang_div_i64(__fib, l_x, l_d);
+    if (__fib->err) goto __fail;
+    l_x = __t1;
+    l_x = tlang_mod_i64(__fib, l_x, 7);
+    int64_t __t2 = tlang_div_i64(__fib, l_x, 0);
+    if (__fib->err) goto __fail;
+    l_x = __t2;
+    l_x = tlang_add_i64(l_x, 1);
+    l_x = tlang_sub_i64(l_x, 1);
+    l_y = tlang_add_i32(l_y, 1);
+    l_y = tlang_mul_i32(l_y, 2);
+    int32_t __t3 = tlang_mod_i32(__fib, l_y, 0);
+    if (__fib->err) goto __fail;
+    l_y = __t3;
+    l_y = tlang_sub_i32(l_y, 1);
+    return tlang_add_i64(l_x, (int64_t)l_y);
+    __fail: ;
+    return 0;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

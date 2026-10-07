@@ -1,0 +1,54 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_models_ts_1qzdgw6__User tl_models_ts_1qzdgw6__User;
+
+struct tl_models_ts_1qzdgw6__User {
+    int64_t f_id;
+    tlang_string f_name;
+};
+
+tlang_string tl_f_models_ts_1qzdgw6__greet(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u);
+tlang_string tl_f_main_ts_1cmw5wz__use(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u);
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib);
+
+tlang_string tl_f_models_ts_1qzdgw6__greet(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u) {
+    return l_u->f_name;
+}
+
+tlang_string tl_f_main_ts_1cmw5wz__use(tlang_fiber* __fib, tl_models_ts_1qzdgw6__User* l_u) {
+    tlang_string __t1 = tl_f_models_ts_1qzdgw6__greet(__fib, l_u);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return (tlang_string){0};
+}
+
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib) {
+    tl_models_ts_1qzdgw6__User* l_u;
+    tlang_string l_s;
+    l_u = (tl_models_ts_1qzdgw6__User*)tlang_alloc_zeroed(__fib, sizeof(tl_models_ts_1qzdgw6__User));
+    l_u->f_name = TLANG_STR("grace");
+    tlang_string __t1 = tl_f_main_ts_1cmw5wz__use(__fib, l_u);
+    if (__fib->err) goto __fail;
+    l_s = __t1;
+    (void)l_s;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main_ts_1cmw5wz__main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

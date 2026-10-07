@@ -1,0 +1,144 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+bool tl_f_allow(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_f_metric(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_f_audit(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_m_Context__handle(tlang_fiber* __fib, tlang_ctx* l_ctx);
+int64_t tl_f_tally(tlang_fiber* __fib, tlang_ctx* l_c, int64_t l_base);
+void tl_m_Context__split(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_m_Context__risky(tlang_fiber* __fib, tlang_ctx* l_ctx);
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+
+bool tl_f_allow(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    return true;
+}
+
+void tl_f_metric(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR(TLANG_STR("done")) }, 1);
+}
+
+void tl_f_audit(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tlang_throw(__fib, 500, TLANG_STR("boom"));
+    goto __fail;
+    __fail: ;
+    return;
+}
+
+void tl_m_Context__handle(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    if (!tl_f_allow(__fib, l_ctx)) goto __guard_denied;
+    tlang_ctx_text(__fib, l_ctx, 200, TLANG_STR("ok"));
+    goto __after;
+    __guard_denied: ;
+    if (!l_ctx->response_sent) tlang_ctx_text(__fib, l_ctx, 403, TLANG_STR("Forbidden"));
+    goto __after;
+    __after: ;
+    {
+        int __after_err = __fib->err;
+        tlang_error __after_e = __fib->error;
+        tl_f_audit(__fib, l_ctx);
+        if (__fib->err) tlang_console_error(__fib, (tlang_value[1]){ TLANG_VAL_STR(__fib->error.message) }, 1);
+        __fib->err = __after_err;
+        __fib->error = __after_e;
+    }
+    {
+        int __after_err = __fib->err;
+        tlang_error __after_e = __fib->error;
+        tl_f_metric(__fib, l_ctx);
+        if (__fib->err) tlang_console_error(__fib, (tlang_value[1]){ TLANG_VAL_STR(__fib->error.message) }, 1);
+        __fib->err = __after_err;
+        __fib->error = __after_e;
+    }
+    return;
+}
+
+int64_t tl_f_tally(tlang_fiber* __fib, tlang_ctx* l_c, int64_t l_base) {
+    int64_t __after_ret = 0;
+    __after_ret = tlang_add_i64(l_base, 1);
+    goto __after;
+    __after: ;
+    {
+        int __after_err = __fib->err;
+        tlang_error __after_e = __fib->error;
+        tl_f_metric(__fib, l_c);
+        if (__fib->err) tlang_console_error(__fib, (tlang_value[1]){ TLANG_VAL_STR(__fib->error.message) }, 1);
+        __fib->err = __after_err;
+        __fib->error = __after_e;
+    }
+    return __after_ret;
+}
+
+void tl_m_Context__split(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    goto __after;
+    __after: ;
+    {
+        int __after_err = __fib->err;
+        tlang_error __after_e = __fib->error;
+        tl_f_audit(__fib, l_ctx);
+        if (__fib->err) tlang_console_error(__fib, (tlang_value[1]){ TLANG_VAL_STR(__fib->error.message) }, 1);
+        __fib->err = __after_err;
+        __fib->error = __after_e;
+    }
+    {
+        int __after_err = __fib->err;
+        tlang_error __after_e = __fib->error;
+        tl_f_metric(__fib, l_ctx);
+        if (__fib->err) tlang_console_error(__fib, (tlang_value[1]){ TLANG_VAL_STR(__fib->error.message) }, 1);
+        __fib->err = __after_err;
+        __fib->error = __after_e;
+    }
+    return;
+}
+
+void tl_m_Context__risky(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    if (!tl_f_allow(__fib, l_ctx)) goto __guard_denied;
+    tlang_throw(__fib, 500, TLANG_STR("nope"));
+    goto __fail;
+    __fail: ;
+    goto __after;
+    __guard_denied: ;
+    if (!l_ctx->response_sent) tlang_ctx_text(__fib, l_ctx, 403, TLANG_STR("Forbidden"));
+    goto __after;
+    __after: ;
+    {
+        int __after_err = __fib->err;
+        tlang_error __after_e = __fib->error;
+        tl_f_metric(__fib, l_ctx);
+        if (__fib->err) tlang_console_error(__fib, (tlang_value[1]){ TLANG_VAL_STR(__fib->error.message) }, 1);
+        __fib->err = __after_err;
+        __fib->error = __after_e;
+    }
+    return;
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    int64_t l_n;
+    tl_m_Context__handle(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    int64_t __t1 = tl_f_tally(__fib, l_ctx, 5);
+    if (__fib->err) goto __fail;
+    l_n = __t1;
+    (void)l_n;
+    tl_m_Context__split(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    tl_m_Context__risky(__fib, l_ctx);
+    if (__fib->err) goto __fail;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

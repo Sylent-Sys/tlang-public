@@ -1,0 +1,66 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+double tl_f_favg(tlang_fiber* __fib, double l_a, double l_b);
+bool tl_f_fops(tlang_fiber* __fib, double l_a, double l_b);
+int64_t tl_f_conv(tlang_fiber* __fib, int64_t l_i, int32_t l_j, double l_f);
+
+double tl_f_favg(tlang_fiber* __fib, double l_a, double l_b) {
+    return (l_a + l_b) / 2.0;
+}
+
+bool tl_f_fops(tlang_fiber* __fib, double l_a, double l_b) {
+    double l_c;
+    double l_d;
+    double l_e;
+    double l_f;
+    double l_g;
+    double l_h;
+    l_c = (l_a * l_b) - 1.5;
+    l_d = -l_c;
+    l_e = 2.0;
+    l_f = 1e+308 * 10.0;
+    (void)l_f;
+    l_g = 0.30000000000000004;
+    (void)l_g;
+    l_h = l_a / 0.0;
+    (void)l_h;
+    return ((l_c < l_d) && (l_e >= 2.0)) || (l_a == l_b);
+}
+
+int64_t tl_f_conv(tlang_fiber* __fib, int64_t l_i, int32_t l_j, double l_f) {
+    double l_a;
+    int64_t l_b;
+    int32_t l_c;
+    int32_t l_d;
+    int64_t l_e;
+    double l_g;
+    int64_t l_h;
+    int32_t l_k;
+    double l_m;
+    l_a = (double)l_i;
+    l_b = (int64_t)l_j;
+    l_c = tlang_i64_to_i32(l_i);
+    l_d = tlang_f64_to_i32(l_f);
+    l_e = tlang_f64_to_i64(l_f);
+    l_g = (double)l_j;
+    l_h = tlang_f64_to_i64(3.9);
+    l_k = tlang_i64_to_i32(5000000000);
+    l_m = 3.0;
+    return tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(l_b, l_e), l_h), (int64_t)l_c), (int64_t)l_d), (int64_t)l_k), tlang_f64_to_i64(l_a)), tlang_f64_to_i64(l_g)), tlang_f64_to_i64(l_m));
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

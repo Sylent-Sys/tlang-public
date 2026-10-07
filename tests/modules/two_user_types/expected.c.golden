@@ -1,0 +1,62 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_alpha_ts_1obp8iu__User tl_alpha_ts_1obp8iu__User;
+typedef struct tl_beta_ts_1gt70je__User tl_beta_ts_1gt70je__User;
+
+struct tl_alpha_ts_1obp8iu__User {
+    int64_t f_id;
+};
+
+struct tl_beta_ts_1gt70je__User {
+    tlang_string f_name;
+};
+
+int64_t tl_f_alpha_ts_1obp8iu__alphaId(tlang_fiber* __fib, tl_alpha_ts_1obp8iu__User* l_u);
+tlang_string tl_f_beta_ts_1gt70je__betaName(tlang_fiber* __fib, tl_beta_ts_1gt70je__User* l_u);
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib);
+
+int64_t tl_f_alpha_ts_1obp8iu__alphaId(tlang_fiber* __fib, tl_alpha_ts_1obp8iu__User* l_u) {
+    return l_u->f_id;
+}
+
+tlang_string tl_f_beta_ts_1gt70je__betaName(tlang_fiber* __fib, tl_beta_ts_1gt70je__User* l_u) {
+    return l_u->f_name;
+}
+
+void tl_f_main_ts_1cmw5wz__main(tlang_fiber* __fib) {
+    tl_alpha_ts_1obp8iu__User* l_ua;
+    tl_beta_ts_1gt70je__User* l_ub;
+    int64_t l_n;
+    tlang_string l_s;
+    l_ua = (tl_alpha_ts_1obp8iu__User*)tlang_alloc_zeroed(__fib, sizeof(tl_alpha_ts_1obp8iu__User));
+    l_ua->f_id = 1;
+    l_ub = (tl_beta_ts_1gt70je__User*)tlang_alloc_zeroed(__fib, sizeof(tl_beta_ts_1gt70je__User));
+    l_ub->f_name = TLANG_STR("x");
+    int64_t __t1 = tl_f_alpha_ts_1obp8iu__alphaId(__fib, l_ua);
+    if (__fib->err) goto __fail;
+    l_n = __t1;
+    (void)l_n;
+    tlang_string __t2 = tl_f_beta_ts_1gt70je__betaName(__fib, l_ub);
+    if (__fib->err) goto __fail;
+    l_s = __t2;
+    (void)l_s;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main_ts_1cmw5wz__main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

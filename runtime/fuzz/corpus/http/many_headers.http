@@ -1,0 +1,13 @@
+POST /echo?a=1 HTTP/1.1
+Host: example.com
+Content-Type: application/json
+Content-Length: 7
+Authorization: Bearer t
+Accept: */*
+User-Agent: fuzz
+X-One: 1
+X-Two: 2
+X-Three: 3
+Connection: keep-alive
+
+{"id":1}

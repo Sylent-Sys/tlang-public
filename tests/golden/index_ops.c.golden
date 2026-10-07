@@ -1,0 +1,78 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+TLANG_SLICE_DEFINE(arr_i64, tlang_slice_i64*)
+
+int64_t tl_f_pos(tlang_fiber* __fib, int64_t l_i);
+tlang_slice_i64* tl_f_arr(tlang_fiber* __fib, tlang_slice_i64* l_xs);
+int64_t tl_f_reads(tlang_fiber* __fib, tlang_slice_i64* l_xs, tlang_slice_str* l_ys, int32_t l_i, tlang_slice_arr_i64* l_grid);
+
+int64_t tl_f_pos(tlang_fiber* __fib, int64_t l_i) {
+    return l_i;
+}
+
+tlang_slice_i64* tl_f_arr(tlang_fiber* __fib, tlang_slice_i64* l_xs) {
+    return l_xs;
+}
+
+int64_t tl_f_reads(tlang_fiber* __fib, tlang_slice_i64* l_xs, tlang_slice_str* l_ys, int32_t l_i, tlang_slice_arr_i64* l_grid) {
+    int64_t l_a;
+    int64_t l_b;
+    int64_t l_c;
+    int64_t l_d;
+    tlang_string l_s;
+    int64_t l_g;
+    int64_t __t1 = TLANG_SLICE_AT(__fib, l_xs, 0, int64_t);
+    if (__fib->err) goto __fail;
+    l_a = __t1;
+    tlang_slice_i64* __t2 = l_xs;
+    int64_t __t3 = tl_f_pos(__fib, 1);
+    if (__fib->err) goto __fail;
+    int64_t __t4 = TLANG_SLICE_AT(__fib, __t2, __t3, int64_t);
+    if (__fib->err) goto __fail;
+    l_b = __t4;
+    tlang_slice_i64* __t5 = tl_f_arr(__fib, l_xs);
+    if (__fib->err) goto __fail;
+    int64_t __t6 = TLANG_SLICE_AT(__fib, __t5, 2, int64_t);
+    if (__fib->err) goto __fail;
+    l_c = __t6;
+    int64_t __t7 = TLANG_SLICE_AT(__fib, l_xs, l_i, int64_t);
+    if (__fib->err) goto __fail;
+    l_d = __t7;
+    tlang_string __t8 = TLANG_SLICE_AT(__fib, l_ys, 0, tlang_string);
+    if (__fib->err) goto __fail;
+    tlang_string __t9 = TLANG_SLICE_AT(__fib, l_ys, 1, tlang_string);
+    if (__fib->err) goto __fail;
+    l_s = tlang_str_concat(__fib, __t8, __t9);
+    (void)l_s;
+    tlang_slice_i64* __t10 = TLANG_SLICE_AT(__fib, l_grid, 1, tlang_slice_i64*);
+    if (__fib->err) goto __fail;
+    int64_t __t11 = TLANG_SLICE_AT(__fib, __t10, 2, int64_t);
+    if (__fib->err) goto __fail;
+    l_g = __t11;
+    int64_t __t12 = TLANG_SLICE_AT(__fib, l_xs, 0, int64_t);
+    if (__fib->err) goto __fail;
+    int64_t __t13 = TLANG_SLICE_AT(__fib, l_xs, 1, int64_t);
+    if (__fib->err) goto __fail;
+    if (__t12 > __t13) {
+        return l_a;
+    }
+    return tlang_add_i64(tlang_add_i64(tlang_add_i64(tlang_add_i64(l_a, l_b), l_c), l_d), l_g);
+    __fail: ;
+    return 0;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

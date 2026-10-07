@@ -1,0 +1,72 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Counter tl_Counter;
+
+struct tl_Counter {
+    int64_t f_hits;
+    tlang_slice_str* f_names;
+};
+
+struct tl_globals {
+    tl_Counter* g_counter;
+    int64_t g_limit;
+};
+
+int64_t tl_f_bump(tlang_fiber* __fib, int64_t l_n);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_bump(tlang_fiber* __fib, int64_t l_n) {
+    tl_Counter* __t1 = __fib->globals->g_counter;
+    __t1->f_hits = tlang_add_i64(__fib->globals->g_counter->f_hits, l_n);
+    tlang_slice_str* __t2 = __fib->globals->g_counter->f_names;
+    TLANG_SLICE_PUSH(__fib, __t2, tlang_str_clone_global(__fib, TLANG_STR("n")));
+    int64_t __t3 = tlang_div_i64(__fib, __fib->globals->g_counter->f_hits, __fib->globals->g_limit);
+    if (__fib->err) goto __fail;
+    return __t3;
+    __fail: ;
+    return 0;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    int64_t l_i;
+    l_i = 0;
+    while (l_i < __fib->globals->g_limit) {
+        int64_t __t1 = tl_f_bump(__fib, l_i);
+        if (__fib->err) goto __fail;
+        tlang_slice_str* __t2 = __fib->globals->g_counter->f_names;
+        tlang_console_log(__fib, (tlang_value[3]){ TLANG_VAL_STR(TLANG_STR("hit")), TLANG_VAL_I64(__t1), TLANG_VAL_I64(__t2->len) }, 3);
+        l_i = tlang_add_i64(l_i, 1);
+    }
+    tlang_slice_str* __t3 = __fib->globals->g_counter->f_names;
+    for (int64_t __i4 = 0; __i4 < __t3->len; __i4++) {
+        tlang_string l_name;
+        l_name = __t3->items[__i4];
+        tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR(l_name) }, 1);
+    }
+    return;
+    __fail: ;
+    return;
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    tl_Counter* __t1 = (tl_Counter*)tlang_alloc_global_zeroed(__fib, sizeof(tl_Counter));
+    __t1->f_names = TLANG_SLICE_NEW_GLOBAL(__fib, str);
+    __fib->globals->g_counter = __t1;
+    __fib->globals->g_limit = 3;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

@@ -1,0 +1,60 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+void tl_f_logs(tlang_fiber* __fib, int64_t l_n, tlang_string l_s, tlang_opt_i64 l_o, int32_t l_i, double l_f, bool l_b);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t __t1 = tlang_div_i64(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+void tl_f_logs(tlang_fiber* __fib, int64_t l_n, tlang_string l_s, tlang_opt_i64 l_o, int32_t l_i, double l_f, bool l_b) {
+    tlang_console_log(__fib, NULL, 0);
+    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR(TLANG_STR("one")) }, 1);
+    tlang_console_log(__fib, (tlang_value[8]){ TLANG_VAL_STR(l_s), TLANG_VAL_I64(l_n), TLANG_VAL_I32(l_i), TLANG_VAL_F64(l_f), TLANG_VAL_BOOL(l_b), TLANG_VAL_I64(7), TLANG_VAL_F64(2.5), TLANG_VAL_BOOL(true) }, 8);
+    int64_t __t1 = tl_f_div(__fib, l_n, 2);
+    if (__fib->err) goto __fail;
+    int64_t __t2 = tl_f_div(__fib, l_n, l_n);
+    if (__fib->err) goto __fail;
+    tlang_console_log(__fib, (tlang_value[3]){ TLANG_VAL_I64(__t1), TLANG_VAL_STR(tlang_str_concat(__fib, l_s, TLANG_STR("!"))), TLANG_VAL_I64(__t2) }, 3);
+    tlang_console_error(__fib, (tlang_value[2]){ TLANG_VAL_STR(TLANG_STR("err")), TLANG_VAL_I64(l_n) }, 2);
+    tlang_console_error(__fib, NULL, 0);
+    if (l_o.has) {
+        tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_I64(l_o.v) }, 1);
+    }
+    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_I64(l_o.has ? l_o.v : 0) }, 1);
+    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR((l_i > 0) ? TLANG_STR("pos") : TLANG_STR("neg")) }, 1);
+    return;
+    __fail: ;
+    return;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    tlang_opt_i64 l_o;
+    l_o = TLANG_SOME(i64, 1);
+    tl_f_logs(__fib, 1, TLANG_STR("s"), l_o, 2, 3.5, true);
+    if (__fib->err) goto __fail;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

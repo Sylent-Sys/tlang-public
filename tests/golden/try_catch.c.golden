@@ -1,0 +1,145 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+int64_t tl_f_tries(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t __t1 = tlang_div_i64(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int64_t tl_f_tries(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t l_r;
+    l_r = 0;
+    {
+        int64_t __t1 = tl_f_div(__fib, l_a, l_b);
+        if (__fib->err) goto __tlang_catch_1;
+        l_r = __t1;
+        goto __tlang_try_end_1;
+    }
+    __tlang_catch_1: ;
+    {
+        tlang_error l_e;
+        l_e = tlang_take_error(__fib);
+        l_r = (int64_t)l_e.status;
+    }
+    __tlang_try_end_1: ;
+    {
+        int64_t __t2 = tl_f_div(__fib, l_r, l_b);
+        if (__fib->err) goto __tlang_catch_2;
+        l_r = __t2;
+        goto __tlang_try_end_2;
+    }
+    __tlang_catch_2: ;
+    {
+        tlang_clear_error(__fib);
+        l_r = -1;
+    }
+    __tlang_try_end_2: ;
+    {
+        int64_t __t3 = tl_f_div(__fib, l_r, l_a);
+        if (__fib->err) goto __tlang_catch_3;
+        l_r = __t3;
+        goto __tlang_try_end_3;
+    }
+    __tlang_catch_3: ;
+    {
+        tlang_error l_unused;
+        l_unused = tlang_take_error(__fib);
+        (void)l_unused;
+        l_r = 0;
+    }
+    __tlang_try_end_3: ;
+    {
+        int64_t __t4 = tl_f_div(__fib, l_a, 0);
+        if (__fib->err) goto __tlang_catch_4;
+        l_r = __t4;
+        goto __tlang_try_end_4;
+    }
+    __tlang_catch_4: ;
+    {
+        tlang_error l_e;
+        tlang_string l_msg;
+        l_e = tlang_take_error(__fib);
+        {
+            int64_t __t5 = tl_f_div(__fib, l_r, l_b);
+            if (__fib->err) goto __tlang_catch_5;
+            l_r = __t5;
+            goto __tlang_try_end_5;
+        }
+        __tlang_catch_5: ;
+        {
+            tlang_error l_e__2;
+            l_e__2 = tlang_take_error(__fib);
+            l_r = (int64_t)l_e__2.status;
+        }
+        __tlang_try_end_5: ;
+        l_msg = l_e.message;
+        l_r = tlang_add_i64(l_r, (int64_t)l_msg.len);
+    }
+    __tlang_try_end_4: ;
+    {
+        l_r = tlang_add_i64(l_r, 1);
+    }
+    {
+        tlang_throw(__fib, 500, TLANG_STR("boom"));
+        goto __tlang_catch_7;
+        goto __tlang_try_end_7;
+    }
+    __tlang_catch_7: ;
+    {
+        tlang_clear_error(__fib);
+        l_r = 42;
+    }
+    __tlang_try_end_7: ;
+    {
+        int64_t __t6 = tl_f_div(__fib, l_a, l_b);
+        if (__fib->err) goto __tlang_catch_8;
+        l_r = __t6;
+        goto __tlang_try_end_8;
+    }
+    __tlang_catch_8: ;
+    {
+        tlang_error l_e;
+        l_e = tlang_take_error(__fib);
+        (void)l_e;
+        int64_t __t7 = tl_f_div(__fib, l_b, l_a);
+        if (__fib->err) goto __fail;
+        l_r = __t7;
+    }
+    __tlang_try_end_8: ;
+    return l_r;
+    __fail: ;
+    return 0;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    int64_t l_x;
+    int64_t __t1 = tl_f_tries(__fib, 1, 0);
+    if (__fib->err) goto __fail;
+    l_x = __t1;
+    (void)l_x;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

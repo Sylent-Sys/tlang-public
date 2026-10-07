@@ -1,0 +1,135 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_C tl_C;
+typedef struct tl_B tl_B;
+typedef struct tl_A tl_A;
+typedef struct tl_Box__C tl_Box__C;
+typedef struct tl_Box__opt_C tl_Box__opt_C;
+typedef struct tl_Box__i64 tl_Box__i64;
+TLANG_SLICE_DEFINE(C, tl_C*)
+TLANG_SLICE_DEFINE(arr_i64, tlang_slice_i64*)
+
+struct tl_C {
+    int64_t f_x;
+};
+
+struct tl_B {
+    tl_C* f_c;
+    tlang_slice_str* f_tags;
+    tlang_slice_str* f_maybeTags;
+};
+
+struct tl_A {
+    tl_B* f_b;
+    tl_B* f_optB;
+    tlang_string f_name;
+    tlang_ctx* f_ctx;
+    tlang_error f_err;
+    tlang_slice_C* f_list;
+};
+
+struct tl_Box__C {
+    tl_C* f_v;
+};
+
+struct tl_Box__opt_C {
+    tl_C* f_v;
+};
+
+struct tl_Box__i64 {
+    int64_t f_v;
+};
+
+struct tl_globals {
+    tl_A* g_shared;
+    tlang_slice_C* g_sharedList;
+};
+
+int64_t tl_f_takeA(tlang_fiber* __fib, tl_A* l_a);
+void tl_f_main(tlang_fiber* __fib);
+
+int64_t tl_f_takeA(tlang_fiber* __fib, tl_A* l_a) {
+    return l_a->f_b->f_c->f_x;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    tl_A* l_a;
+    int64_t l_n;
+    tl_C* l_c;
+    tlang_slice_C* l_cs;
+    tlang_slice_arr_i64* l_nested;
+    tlang_error l_e1;
+    tlang_error l_e2;
+    tlang_error l_e3;
+    tl_Box__C* l_bx;
+    tl_Box__opt_C* l_bo;
+    tl_Box__i64* l_bi;
+    tl_A* __t1 = (tl_A*)tlang_alloc_zeroed(__fib, sizeof(tl_A));
+    tl_B* __t2 = (tl_B*)tlang_alloc_zeroed(__fib, sizeof(tl_B));
+    __t2->f_c = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));
+    __t2->f_tags = TLANG_SLICE_NEW(__fib, str);
+    __t1->f_b = __t2;
+    __t1->f_list = TLANG_SLICE_NEW(__fib, C);
+    l_a = __t1;
+    (void)l_a;
+    tl_A* __t3 = (tl_A*)tlang_alloc_zeroed(__fib, sizeof(tl_A));
+    tl_B* __t4 = (tl_B*)tlang_alloc_zeroed(__fib, sizeof(tl_B));
+    __t4->f_c = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));
+    __t4->f_tags = TLANG_SLICE_NEW(__fib, str);
+    __t3->f_b = __t4;
+    __t3->f_list = TLANG_SLICE_NEW(__fib, C);
+    int64_t __t5 = tl_f_takeA(__fib, __t3);
+    if (__fib->err) goto __fail;
+    l_n = __t5;
+    (void)l_n;
+    l_c = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));
+    (void)l_c;
+    l_cs = TLANG_SLICE_NEW(__fib, C);
+    (void)l_cs;
+    l_nested = TLANG_SLICE_NEW(__fib, arr_i64);
+    (void)l_nested;
+    l_e1 = tlang_error_make(TLANG_STR("m"), 500);
+    (void)l_e1;
+    l_e2 = tlang_error_make(TLANG_STR("m"), 404);
+    (void)l_e2;
+    l_e3 = tlang_error_make(TLANG_STR("g"), 500);
+    (void)l_e3;
+    tl_Box__C* __t6 = (tl_Box__C*)tlang_alloc_zeroed(__fib, sizeof(tl_Box__C));
+    __t6->f_v = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));
+    l_bx = __t6;
+    (void)l_bx;
+    l_bo = (tl_Box__opt_C*)tlang_alloc_zeroed(__fib, sizeof(tl_Box__opt_C));
+    (void)l_bo;
+    l_bi = (tl_Box__i64*)tlang_alloc_zeroed(__fib, sizeof(tl_Box__i64));
+    (void)l_bi;
+    return;
+    __fail: ;
+    return;
+}
+
+static void tl__init_globals(tlang_fiber* __fib, void* __globals) {
+    tl_A* __t1 = (tl_A*)tlang_alloc_global_zeroed(__fib, sizeof(tl_A));
+    tl_B* __t2 = (tl_B*)tlang_alloc_global_zeroed(__fib, sizeof(tl_B));
+    __t2->f_c = (tl_C*)tlang_alloc_global_zeroed(__fib, sizeof(tl_C));
+    __t2->f_tags = TLANG_SLICE_NEW_GLOBAL(__fib, str);
+    __t1->f_b = __t2;
+    __t1->f_list = TLANG_SLICE_NEW_GLOBAL(__fib, C);
+    __fib->globals->g_shared = __t1;
+    __fib->globals->g_sharedList = TLANG_SLICE_NEW_GLOBAL(__fib, C);
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = tl__init_globals,
+    .globals_size = sizeof(struct tl_globals),
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

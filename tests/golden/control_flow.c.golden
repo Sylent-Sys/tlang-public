@@ -1,0 +1,122 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b);
+int64_t tl_f_next(tlang_fiber* __fib, int64_t l_i);
+int64_t tl_f_loops(tlang_fiber* __fib, int64_t l_n, int64_t l_d);
+
+int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
+    int64_t __t1 = tlang_div_i64(__fib, l_a, l_b);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+int64_t tl_f_next(tlang_fiber* __fib, int64_t l_i) {
+    return tlang_add_i64(l_i, 1);
+}
+
+int64_t tl_f_loops(tlang_fiber* __fib, int64_t l_n, int64_t l_d) {
+    int64_t l_sum;
+    int64_t l_j;
+    l_sum = 0;
+    {
+        int64_t l_i;
+        l_i = 0;
+        for (; l_i < l_n; l_i = tlang_add_i64(l_i, 1)) {
+            if (l_i == 3) {
+                continue;
+            }
+            if (l_i > 10) {
+                break;
+            }
+            l_sum = tlang_add_i64(l_sum, l_i);
+        }
+    }
+    l_j = 0;
+    while (l_j < l_n) {
+        l_j = tlang_add_i64(l_j, 1);
+    }
+    for (;;) {
+        break;
+    }
+    {
+        int64_t l_k;
+        l_k = 0;
+        for (;;) {
+            int64_t __t1 = tl_f_div(__fib, l_n, l_d);
+            if (__fib->err) goto __fail;
+            if (!(l_k < __t1)) break;
+            if (l_k == 2) {
+                goto __cont_1;
+            }
+            l_sum = tlang_add_i64(l_sum, l_k);
+            __cont_1: ;
+            int64_t __t2 = tl_f_next(__fib, l_k);
+            if (__fib->err) goto __fail;
+            l_k = __t2;
+        }
+    }
+    {
+        int64_t l_m;
+        l_m = 0;
+        for (; l_m < l_n; (void)(tlang_add_i64(l_m, 1))) {
+            break;
+        }
+    }
+    if (l_n > 0) {
+        l_sum = tlang_add_i64(l_sum, 1);
+    } else {
+        int64_t __t3 = tl_f_div(__fib, l_n, l_d);
+        if (__fib->err) goto __fail;
+        if (__t3 > 0) {
+            l_sum = tlang_add_i64(l_sum, 2);
+        } else if (l_n < -5) {
+            l_sum = tlang_add_i64(l_sum, 3);
+        } else {
+            l_sum = tlang_sub_i64(l_sum, 1);
+        }
+    }
+    if (l_n > 100) {
+        int64_t l_w;
+        l_w = 1;
+        (void)l_w;
+    }
+    while (l_j > l_n) {
+        int64_t l_v;
+        l_v = 2;
+        (void)l_v;
+    }
+    {
+        int64_t l_p;
+        l_p = 0;
+        for (; l_p < 2; l_p = tlang_add_i64(l_p, 1)) {
+            {
+                int64_t l_r;
+                l_r = 0;
+                for (; l_r < 2; l_r = tlang_add_i64(l_r, 1)) {
+                    l_sum = tlang_add_i64(l_sum, 1);
+                }
+            }
+        }
+    }
+    return l_sum;
+    __fail: ;
+    return 0;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

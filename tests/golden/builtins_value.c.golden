@@ -1,0 +1,90 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+int64_t tl_f_strings(tlang_fiber* __fib, tlang_string l_s, tlang_string l_t);
+tlang_string tl_f_numbers(tlang_fiber* __fib, int32_t l_a, int64_t l_b, double l_c, bool l_d);
+int64_t tl_f_idx(tlang_fiber* __fib, int64_t l_i);
+int64_t tl_f_arrays(tlang_fiber* __fib, tlang_slice_i64* l_xs);
+int32_t tl_f_errors(tlang_fiber* __fib);
+
+int64_t tl_f_strings(tlang_fiber* __fib, tlang_string l_s, tlang_string l_t) {
+    int64_t l_n;
+    bool l_e;
+    tlang_string l_sl;
+    bool l_st;
+    bool l_en;
+    int64_t l_ix;
+    tlang_string l_cl;
+    tlang_string l_cg;
+    int64_t l_parsed;
+    int64_t l_lit;
+    l_n = (int64_t)l_s.len;
+    l_e = tlang_str_eq(l_s, l_t);
+    (void)l_e;
+    l_sl = tlang_str_slice(l_s, 1, 3);
+    (void)l_sl;
+    l_st = tlang_str_starts_with(l_s, TLANG_STR("ab"));
+    (void)l_st;
+    l_en = tlang_str_ends_with(l_s, l_t);
+    (void)l_en;
+    l_ix = tlang_str_index_of(l_s, TLANG_STR("x"));
+    l_cl = tlang_str_clone(__fib, l_s);
+    (void)l_cl;
+    l_cg = tlang_str_clone_global(__fib, l_s);
+    (void)l_cg;
+    int64_t __t1 = tlang_str_to_int(__fib, l_s);
+    if (__fib->err) goto __fail;
+    l_parsed = __t1;
+    int64_t __t2 = tlang_str_to_int(__fib, TLANG_STR("42"));
+    if (__fib->err) goto __fail;
+    l_lit = __t2;
+    (void)(tlang_str_eq(l_s, TLANG_STR("unused")));
+    return tlang_add_i64(tlang_add_i64(tlang_add_i64(l_n, l_ix), l_parsed), l_lit);
+    __fail: ;
+    return 0;
+}
+
+tlang_string tl_f_numbers(tlang_fiber* __fib, int32_t l_a, int64_t l_b, double l_c, bool l_d) {
+    return tlang_str_concat(__fib, tlang_str_concat(__fib, tlang_str_concat(__fib, tlang_str_concat(__fib, tlang_i32_to_string(__fib, l_a), tlang_i64_to_string(__fib, l_b)), tlang_f64_to_string(__fib, l_c)), tlang_bool_to_string(__fib, l_d)), tlang_i64_to_string(__fib, 5));
+}
+
+int64_t tl_f_idx(tlang_fiber* __fib, int64_t l_i) {
+    return l_i;
+}
+
+int64_t tl_f_arrays(tlang_fiber* __fib, tlang_slice_i64* l_xs) {
+    TLANG_SLICE_PUSH(__fib, l_xs, 1);
+    TLANG_SLICE_PUSH(__fib, l_xs, l_xs->len);
+    int64_t __t1 = tl_f_idx(__fib, l_xs->len);
+    if (__fib->err) goto __fail;
+    TLANG_SLICE_PUSH(__fib, l_xs, __t1);
+    return l_xs->len;
+    __fail: ;
+    return 0;
+}
+
+int32_t tl_f_errors(tlang_fiber* __fib) {
+    tlang_error l_e;
+    tlang_string l_m;
+    int32_t l_st;
+    l_e = tlang_error_make(TLANG_STR("boom"), 404);
+    l_m = l_e.message;
+    (void)l_m;
+    l_st = l_e.status;
+    return l_st;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

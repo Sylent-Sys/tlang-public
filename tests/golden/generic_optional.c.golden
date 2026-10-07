@@ -1,0 +1,101 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+void tl_f_main(tlang_fiber* __fib);
+int64_t tl_f_pick__i64(tlang_fiber* __fib, tlang_opt_i64 l_x, int64_t l_d);
+tlang_string tl_f_pick__opt_str(tlang_fiber* __fib, tlang_string l_x, tlang_string l_d);
+int64_t tl_f_force__i64(tlang_fiber* __fib, tlang_opt_i64 l_x);
+tlang_string tl_f_force__opt_str(tlang_fiber* __fib, tlang_string l_x);
+int64_t tl_f_orElse__i64(tlang_fiber* __fib, tlang_opt_i64 l_x, int64_t l_d);
+tlang_string tl_f_orElse__opt_str(tlang_fiber* __fib, tlang_string l_x, tlang_string l_d);
+
+void tl_f_main(tlang_fiber* __fib) {
+    tlang_opt_i64 l_a;
+    int64_t l_p1;
+    tlang_string l_s;
+    tlang_string l_e;
+    tlang_string l_p2;
+    int64_t l_f1;
+    tlang_string l_f2;
+    int64_t l_o1;
+    tlang_string l_o2;
+    l_a = TLANG_SOME(i64, 5);
+    int64_t __t1 = tl_f_pick__i64(__fib, l_a, 0);
+    if (__fib->err) goto __fail;
+    l_p1 = __t1;
+    (void)l_p1;
+    l_s = tlang_str_some(TLANG_STR("x"));
+    l_e = TLANG_STR_NULL;
+    tlang_string __t2 = tl_f_pick__opt_str(__fib, l_s, l_e);
+    if (__fib->err) goto __fail;
+    l_p2 = __t2;
+    (void)l_p2;
+    int64_t __t3 = tl_f_force__i64(__fib, l_a);
+    if (__fib->err) goto __fail;
+    l_f1 = __t3;
+    (void)l_f1;
+    tlang_string __t4 = tl_f_force__opt_str(__fib, l_s);
+    if (__fib->err) goto __fail;
+    l_f2 = __t4;
+    (void)l_f2;
+    int64_t __t5 = tl_f_orElse__i64(__fib, l_a, 1);
+    if (__fib->err) goto __fail;
+    l_o1 = __t5;
+    (void)l_o1;
+    tlang_string __t6 = tl_f_orElse__opt_str(__fib, l_s, l_e);
+    if (__fib->err) goto __fail;
+    l_o2 = __t6;
+    (void)l_o2;
+    return;
+    __fail: ;
+    return;
+}
+
+int64_t tl_f_pick__i64(tlang_fiber* __fib, tlang_opt_i64 l_x, int64_t l_d) {
+    if (l_x.has) {
+        return l_x.v;
+    }
+    return l_d;
+}
+
+tlang_string tl_f_pick__opt_str(tlang_fiber* __fib, tlang_string l_x, tlang_string l_d) {
+    if (l_x.data != NULL) {
+        return l_x;
+    }
+    return l_d;
+}
+
+int64_t tl_f_force__i64(tlang_fiber* __fib, tlang_opt_i64 l_x) {
+    int64_t __t1 = tlang_unwrap_i64(__fib, l_x);
+    if (__fib->err) goto __fail;
+    return __t1;
+    __fail: ;
+    return 0;
+}
+
+tlang_string tl_f_force__opt_str(tlang_fiber* __fib, tlang_string l_x) {
+    return l_x;
+}
+
+int64_t tl_f_orElse__i64(tlang_fiber* __fib, tlang_opt_i64 l_x, int64_t l_d) {
+    return l_x.has ? l_x.v : l_d;
+}
+
+tlang_string tl_f_orElse__opt_str(tlang_fiber* __fib, tlang_string l_x, tlang_string l_d) {
+    return l_x;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

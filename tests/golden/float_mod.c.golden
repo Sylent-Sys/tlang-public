@@ -1,0 +1,47 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+double tl_f_fmod(tlang_fiber* __fib, double l_a, double l_b);
+double tl_f_fmodAssign(tlang_fiber* __fib, double l_a);
+void tl_f_main(tlang_fiber* __fib);
+
+double tl_f_fmod(tlang_fiber* __fib, double l_a, double l_b) {
+    return tlang_mod_f64(l_a, l_b);
+}
+
+double tl_f_fmodAssign(tlang_fiber* __fib, double l_a) {
+    double l_x;
+    l_x = l_a;
+    l_x = tlang_mod_f64(l_x, 2.5);
+    return l_x;
+}
+
+void tl_f_main(tlang_fiber* __fib) {
+    double l_r;
+    double l_s;
+    double __t1 = tl_f_fmod(__fib, 7.5, 2.0);
+    if (__fib->err) goto __fail;
+    l_r = __t1;
+    double __t2 = tl_f_fmodAssign(__fib, l_r);
+    if (__fib->err) goto __fail;
+    l_s = __t2;
+    (void)l_s;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = NULL,
+    .main         = tl_f_main,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

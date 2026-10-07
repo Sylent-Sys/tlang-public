@@ -1,0 +1,165 @@
+# TLang comparative-benchmark image: everything the dev image has (Go 1.26,
+# gcc, clang, a LINK-capable tcc built from source, libpq/PostgreSQL 17) PLUS
+# the two runtimes the comparative benchmark pits TLang against — Node.js and
+# Bun — and the pinning tool (taskset, from util-linux) the enforced p99 gate
+# needs. The result is one image that reproducibly runs
+# `TestBenchmarkCompare` (TLang vs Node vs Bun) on any machine with a container
+# engine, with every version pinned.
+#
+# WHY A SEPARATE IMAGE (not docker/Dockerfile):
+#   - The dev image deliberately omits Node and Bun ("not in the tlang-dev
+#     container", tests/bench/README.md). The benchmark needs both.
+#   - The Node leg's N-process SO_REUSEPORT model requires Node >= 23.1 (the
+#     `reusePort` listen option landed in 23.1); the distro Node on trixie is
+#     older, so Node is installed from the official NodeSource/nodejs tarball at
+#     a pinned version.
+#   - Keeping it separate leaves the lean dev image unchanged for the compile /
+#     runtime matrices.
+#
+# This file mirrors docker/Dockerfile's resolved design tension (a link-capable
+# tcc on modern glibc, built from pinned upstream source) and extends it. See
+# docker/README.md for the full rationale behind the tcc build stage.
+
+# ---------------------------------------------------------------------------
+# Stage 1: build a link-capable tcc (0.9.28rc) from pinned upstream source.
+# Identical to docker/Dockerfile stage 1 — the TLang `clang-release` leg uses
+# clang, not tcc, but we keep the full compiler matrix available so the same
+# image can also run the ccompile / runtime matrices if desired.
+# ---------------------------------------------------------------------------
+FROM golang:1.26-trixie@sha256:af00f232205a01baf323bddc5bb4a4ea2e4cbf49e8ccc988beb2558d0f9c882a AS tcc-builder
+
+ARG TCC_REPO=https://repo.or.cz/tinycc.git
+ARG TCC_REV=43c7708b85681a2fd4451c8a541af4494a8919b2
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      gcc make binutils libc6-dev git ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    git clone "${TCC_REPO}" /tmp/tcc; \
+    cd /tmp/tcc; \
+    git checkout "${TCC_REV}"; \
+    test "$(git rev-parse HEAD)" = "${TCC_REV}"; \
+    ./configure --prefix=/opt/tcc; \
+    make; \
+    make install
+
+RUN set -eux; \
+    printf 'int main(void){return 0;}\n' > /tmp/linkcheck.c; \
+    /opt/tcc/bin/tcc -o /tmp/linkcheck /tmp/linkcheck.c; \
+    /tmp/linkcheck; \
+    echo "tcc link-check OK:"; \
+    /opt/tcc/bin/tcc -v
+
+# ---------------------------------------------------------------------------
+# Stage 2: fetch pinned Node.js (>= 23.1) and Bun as self-contained tarballs.
+# Pinning both the versions and their SHA-256 checksums is what makes the
+# benchmark reproducible: the exact same runtime bytes run on every machine.
+# ---------------------------------------------------------------------------
+FROM golang:1.26-trixie@sha256:af00f232205a01baf323bddc5bb4a4ea2e4cbf49e8ccc988beb2558d0f9c882a AS runtime-fetch
+
+# Node.js: official tarball from nodejs.org. v24.21.0 is the Active LTS
+# ("Krypton") at image-authoring time and comfortably clears the >= 23.1
+# reusePort floor the Node bench server needs. Checksums are the linux-x64 and
+# linux-arm64 entries from https://nodejs.org/dist/v24.21.0/SHASUMS256.txt.
+ARG NODE_VERSION=24.21.0
+ARG NODE_SHA256_X64=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
+ARG NODE_SHA256_ARM64=6ad1325edbdb5649c379b75a237147a666c95d4f9ae8d340fef2d1575d289ad2
+
+# Bun: official zip from the pinned GitHub release bun-v1.4.2. Checksums are the
+# GitHub asset sha256 digests for bun-linux-x64.zip and bun-linux-aarch64.zip.
+ARG BUN_VERSION=1.4.2
+ARG BUN_SHA256_X64=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
+ARG BUN_SHA256_ARM64=54328bbc2d9c8e0c9f892c544d66c57a83b84139e34909e5ee81758f1ac8fda7
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl xz-utils unzip \
+ && rm -rf /var/lib/apt/lists/*
+
+# --- Node.js (checksum pinned per arch) ---
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64) node_arch=x64;   node_sha="${NODE_SHA256_X64}"   ;; \
+      arm64) node_arch=arm64; node_sha="${NODE_SHA256_ARM64}" ;; \
+      *) echo "unsupported arch for pinned Node tarball: $arch" >&2; exit 1 ;; \
+    esac; \
+    url="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    curl -fsSL -o /tmp/node.tar.xz "$url"; \
+    echo "${node_sha}  /tmp/node.tar.xz" | sha256sum -c -; \
+    mkdir -p /opt/node; \
+    tar -xJf /tmp/node.tar.xz -C /opt/node --strip-components=1; \
+    rm /tmp/node.tar.xz; \
+    /opt/node/bin/node --version
+
+# --- Bun (checksum pinned per arch) ---
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64) bun_target=bun-linux-x64;      bun_sha="${BUN_SHA256_X64}"   ;; \
+      arm64) bun_target=bun-linux-aarch64;  bun_sha="${BUN_SHA256_ARM64}" ;; \
+      *) echo "unsupported arch for pinned Bun release: $arch" >&2; exit 1 ;; \
+    esac; \
+    url="https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/${bun_target}.zip"; \
+    curl -fsSL -o /tmp/bun.zip "$url"; \
+    echo "${bun_sha}  /tmp/bun.zip" | sha256sum -c -; \
+    unzip -q /tmp/bun.zip -d /tmp/bun; \
+    mkdir -p /opt/bun/bin; \
+    cp "/tmp/bun/${bun_target}/bun" /opt/bun/bin/bun; \
+    chmod +x /opt/bun/bin/bun; \
+    rm -rf /tmp/bun /tmp/bun.zip; \
+    /opt/bun/bin/bun --version
+
+# ---------------------------------------------------------------------------
+# Stage 3: the final benchmark image.
+# ---------------------------------------------------------------------------
+FROM golang:1.26-trixie@sha256:af00f232205a01baf323bddc5bb4a4ea2e4cbf49e8ccc988beb2558d0f9c882a
+
+# The compiler/runtime toolchain (same set as the dev image). util-linux
+# provides `taskset`, which the enforced p99 gate needs for disjoint CPU
+# pinning; procps/psmisc help with process inspection during a run.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      gcc clang lld llvm libclang-rt-19-dev make gdb \
+      libpq-dev postgresql postgresql-client \
+      curl ca-certificates procps util-linux psmisc \
+ && rm -rf /var/lib/apt/lists/*
+
+# Link-capable tcc (0.9.28rc) from stage 1.
+COPY --from=tcc-builder /opt/tcc /opt/tcc
+RUN ln -sf /opt/tcc/bin/tcc /usr/local/bin/tcc
+
+# Pinned Node.js and Bun from stage 2.
+COPY --from=runtime-fetch /opt/node /opt/node
+COPY --from=runtime-fetch /opt/bun /opt/bun
+RUN ln -sf /opt/node/bin/node /usr/local/bin/node \
+ && ln -sf /opt/node/bin/npm  /usr/local/bin/npm \
+ && ln -sf /opt/bun/bin/bun   /usr/local/bin/bun
+
+# initdb refuses to run as root; kept for parity with the dev image so the same
+# image can also run the DB-backed harness if ever needed. The benchmark itself
+# is DB-free.
+RUN useradd -m -u 1000 -s /bin/bash tlang || true
+
+ENV PATH="/usr/lib/postgresql/17/bin:${PATH}" \
+    GOFLAGS="-buildvcs=false" \
+    CGO_ENABLED=0
+
+# Verify all three runtimes resolve and meet their floors at build time, so a
+# broken image fails to build rather than at benchmark time.
+RUN set -eux; \
+    go version; \
+    clang --version | head -n1; \
+    tcc -v; \
+    node --version; \
+    bun --version; \
+    node -e 'const [maj,min]=process.versions.node.split(".").map(Number); if (maj<23 || (maj===23 && min<1)) { console.error("Node "+process.versions.node+" < 23.1 (reusePort required)"); process.exit(1); } console.log("Node OK: v"+process.versions.node);'
+
+# A thin benchmark entrypoint: default to the comparative run, overridable by
+# passing a different command. The repo is expected to be mounted at /src.
+COPY docker/bench-entrypoint.sh /usr/local/bin/bench-entrypoint.sh
+RUN chmod +x /usr/local/bin/bench-entrypoint.sh
+
+WORKDIR /src
+ENTRYPOINT ["/usr/local/bin/bench-entrypoint.sh"]

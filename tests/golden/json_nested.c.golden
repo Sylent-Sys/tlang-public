@@ -1,0 +1,624 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Address tl_Address;
+typedef struct tl_Tag tl_Tag;
+typedef struct tl_Profile tl_Profile;
+TLANG_SLICE_DEFINE(Tag, tl_Tag*)
+TLANG_SLICE_DEFINE(arr_i64, tlang_slice_i64*)
+TLANG_SLICE_DEFINE(opt_Tag, tl_Tag*)
+TLANG_SLICE_DEFINE(opt_str, tlang_string)
+
+struct tl_Address {
+    tlang_string f_city;
+    tlang_opt_i32 f_zip;
+};
+
+struct tl_Tag {
+    tlang_string f_name;
+};
+
+struct tl_Profile {
+    int64_t f_id;
+    tlang_string f_name;
+    double f_score;
+    bool f_active;
+    tlang_string f_nick;
+    tlang_opt_i32 f_age;
+    tlang_opt_i64 f_big;
+    tlang_opt_f64 f_ratio;
+    tlang_opt_bool f_flag;
+    tl_Address* f_home;
+    tl_Address* f_work;
+    tlang_slice_Tag* f_tags;
+    tlang_slice_str* f_labels;
+    tlang_slice_arr_i64* f_matrix;
+    tlang_slice_opt_Tag* f_maybeTags;
+    tlang_slice_opt_str* f_notes;
+    int32_t f_small;
+};
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+static bool tlj_parse_Address(tlang_fiber* __fib, const char** __p, const char* __end, tl_Address* __out, int __depth);
+static void tlj_write_Address(tlang_fiber* __fib, tlang_buf* __b, tl_Address* __v);
+static bool tlj_parse_Tag(tlang_fiber* __fib, const char** __p, const char* __end, tl_Tag* __out, int __depth);
+static void tlj_write_Tag(tlang_fiber* __fib, tlang_buf* __b, tl_Tag* __v);
+static bool tlj_parse_arr_Tag(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_Tag** __out, int __depth);
+static void tlj_write_arr_Tag(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_Tag* __v);
+static bool tlj_parse_arr_str(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_str** __out, int __depth);
+static void tlj_write_arr_str(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_str* __v);
+static bool tlj_parse_arr_i64(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_i64** __out, int __depth);
+static void tlj_write_arr_i64(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_i64* __v);
+static bool tlj_parse_arr_arr_i64(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_arr_i64** __out, int __depth);
+static void tlj_write_arr_arr_i64(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_arr_i64* __v);
+static bool tlj_parse_arr_opt_Tag(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_opt_Tag** __out, int __depth);
+static void tlj_write_arr_opt_Tag(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_opt_Tag* __v);
+static bool tlj_parse_arr_opt_str(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_opt_str** __out, int __depth);
+static void tlj_write_arr_opt_str(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_opt_str* __v);
+static bool tlj_parse_Profile(tlang_fiber* __fib, const char** __p, const char* __end, tl_Profile* __out, int __depth);
+static void tlj_write_Profile(tlang_fiber* __fib, tlang_buf* __b, tl_Profile* __v);
+
+static bool tlj_parse_Address(tlang_fiber* __fib, const char** __p, const char* __end, tl_Address* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 4 && memcmp(__key.data, "city", 4) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_city)) return false;
+            __seen |= UINT64_C(1) << 0;
+        } else if (__key.len == 3 && memcmp(__key.data, "zip", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_zip = TLANG_NONE(i32);
+            } else {
+                if (!json_scan_int32(&__q, __end, &__out->f_zip.v)) return false;
+                __out->f_zip.has = true;
+            }
+            __seen |= UINT64_C(1) << 1;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x1)) == UINT64_C(0x1);
+}
+
+static void tlj_write_Address(tlang_fiber* __fib, tlang_buf* __b, tl_Address* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"city\":");
+    json_write_str(__b, __v->f_city);
+    TLANG_BUF_PUT_LIT(__b, ",\"zip\":");
+    if (__v->f_zip.has) {
+        json_write_i32(__b, __v->f_zip.v);
+    } else {
+        json_write_null(__b);
+    }
+    tlang_buf_putc(__b, '}');
+}
+
+static bool tlj_parse_Tag(tlang_fiber* __fib, const char** __p, const char* __end, tl_Tag* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 4 && memcmp(__key.data, "name", 4) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_name)) return false;
+            __seen |= UINT64_C(1) << 0;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x1)) == UINT64_C(0x1);
+}
+
+static void tlj_write_Tag(tlang_fiber* __fib, tlang_buf* __b, tl_Tag* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"name\":");
+    json_write_str(__b, __v->f_name);
+    tlang_buf_putc(__b, '}');
+}
+
+static bool tlj_parse_arr_Tag(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_Tag** __out, int __depth) {
+    const char* __q = *__p;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '[') return false;
+    __q++;
+    tlang_slice_Tag* __s = TLANG_SLICE_NEW(__fib, Tag);
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == ']') { __q++; goto __done; }
+    for (;;) {
+        __q = json_skip_ws(__q, __end);
+        tl_Tag* __e;
+        tl_Tag* __o = (tl_Tag*)tlang_alloc_zeroed(__fib, sizeof(tl_Tag));
+        if (!tlj_parse_Tag(__fib, &__q, __end, __o, __depth + 1)) return false;
+        __e = __o;
+        TLANG_SLICE_PUSH(__fib, __s, __e);
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == ']') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__out = __s;
+    *__p = __q;
+    return true;
+}
+
+static void tlj_write_arr_Tag(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_Tag* __v) {
+    tlang_buf_putc(__b, '[');
+    for (int64_t __i = 0; __i < __v->len; __i++) {
+        if (__i > 0) tlang_buf_putc(__b, ',');
+        tl_Tag* __e = __v->items[__i];
+        tlj_write_Tag(__fib, __b, __e);
+    }
+    tlang_buf_putc(__b, ']');
+}
+
+static bool tlj_parse_arr_str(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_str** __out, int __depth) {
+    const char* __q = *__p;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '[') return false;
+    __q++;
+    tlang_slice_str* __s = TLANG_SLICE_NEW(__fib, str);
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == ']') { __q++; goto __done; }
+    for (;;) {
+        __q = json_skip_ws(__q, __end);
+        tlang_string __e;
+        if (!json_scan_string(&__q, __end, __fib->arena, &__e)) return false;
+        TLANG_SLICE_PUSH(__fib, __s, __e);
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == ']') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__out = __s;
+    *__p = __q;
+    return true;
+}
+
+static void tlj_write_arr_str(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_str* __v) {
+    tlang_buf_putc(__b, '[');
+    for (int64_t __i = 0; __i < __v->len; __i++) {
+        if (__i > 0) tlang_buf_putc(__b, ',');
+        tlang_string __e = __v->items[__i];
+        json_write_str(__b, __e);
+    }
+    tlang_buf_putc(__b, ']');
+}
+
+static bool tlj_parse_arr_i64(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_i64** __out, int __depth) {
+    const char* __q = *__p;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '[') return false;
+    __q++;
+    tlang_slice_i64* __s = TLANG_SLICE_NEW(__fib, i64);
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == ']') { __q++; goto __done; }
+    for (;;) {
+        __q = json_skip_ws(__q, __end);
+        int64_t __e;
+        if (!json_scan_int64(&__q, __end, &__e)) return false;
+        TLANG_SLICE_PUSH(__fib, __s, __e);
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == ']') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__out = __s;
+    *__p = __q;
+    return true;
+}
+
+static void tlj_write_arr_i64(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_i64* __v) {
+    tlang_buf_putc(__b, '[');
+    for (int64_t __i = 0; __i < __v->len; __i++) {
+        if (__i > 0) tlang_buf_putc(__b, ',');
+        int64_t __e = __v->items[__i];
+        json_write_i64(__b, __e);
+    }
+    tlang_buf_putc(__b, ']');
+}
+
+static bool tlj_parse_arr_arr_i64(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_arr_i64** __out, int __depth) {
+    const char* __q = *__p;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '[') return false;
+    __q++;
+    tlang_slice_arr_i64* __s = TLANG_SLICE_NEW(__fib, arr_i64);
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == ']') { __q++; goto __done; }
+    for (;;) {
+        __q = json_skip_ws(__q, __end);
+        tlang_slice_i64* __e;
+        tlang_slice_i64* __a = NULL;
+        if (!tlj_parse_arr_i64(__fib, &__q, __end, &__a, __depth + 1)) return false;
+        __e = __a;
+        TLANG_SLICE_PUSH(__fib, __s, __e);
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == ']') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__out = __s;
+    *__p = __q;
+    return true;
+}
+
+static void tlj_write_arr_arr_i64(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_arr_i64* __v) {
+    tlang_buf_putc(__b, '[');
+    for (int64_t __i = 0; __i < __v->len; __i++) {
+        if (__i > 0) tlang_buf_putc(__b, ',');
+        tlang_slice_i64* __e = __v->items[__i];
+        tlj_write_arr_i64(__fib, __b, __e);
+    }
+    tlang_buf_putc(__b, ']');
+}
+
+static bool tlj_parse_arr_opt_Tag(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_opt_Tag** __out, int __depth) {
+    const char* __q = *__p;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '[') return false;
+    __q++;
+    tlang_slice_opt_Tag* __s = TLANG_SLICE_NEW(__fib, opt_Tag);
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == ']') { __q++; goto __done; }
+    for (;;) {
+        __q = json_skip_ws(__q, __end);
+        tl_Tag* __e;
+        if (json_scan_null(&__q, __end)) {
+            __e = NULL;
+        } else {
+            tl_Tag* __o = (tl_Tag*)tlang_alloc_zeroed(__fib, sizeof(tl_Tag));
+            if (!tlj_parse_Tag(__fib, &__q, __end, __o, __depth + 1)) return false;
+            __e = __o;
+        }
+        TLANG_SLICE_PUSH(__fib, __s, __e);
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == ']') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__out = __s;
+    *__p = __q;
+    return true;
+}
+
+static void tlj_write_arr_opt_Tag(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_opt_Tag* __v) {
+    tlang_buf_putc(__b, '[');
+    for (int64_t __i = 0; __i < __v->len; __i++) {
+        if (__i > 0) tlang_buf_putc(__b, ',');
+        tl_Tag* __e = __v->items[__i];
+        if (__e != NULL) {
+            tlj_write_Tag(__fib, __b, __e);
+        } else {
+            json_write_null(__b);
+        }
+    }
+    tlang_buf_putc(__b, ']');
+}
+
+static bool tlj_parse_arr_opt_str(tlang_fiber* __fib, const char** __p, const char* __end, tlang_slice_opt_str** __out, int __depth) {
+    const char* __q = *__p;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '[') return false;
+    __q++;
+    tlang_slice_opt_str* __s = TLANG_SLICE_NEW(__fib, opt_str);
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == ']') { __q++; goto __done; }
+    for (;;) {
+        __q = json_skip_ws(__q, __end);
+        tlang_string __e;
+        if (json_scan_null(&__q, __end)) {
+            __e = TLANG_STR_NULL;
+        } else {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__e)) return false;
+        }
+        TLANG_SLICE_PUSH(__fib, __s, __e);
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == ']') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__out = __s;
+    *__p = __q;
+    return true;
+}
+
+static void tlj_write_arr_opt_str(tlang_fiber* __fib, tlang_buf* __b, tlang_slice_opt_str* __v) {
+    tlang_buf_putc(__b, '[');
+    for (int64_t __i = 0; __i < __v->len; __i++) {
+        if (__i > 0) tlang_buf_putc(__b, ',');
+        tlang_string __e = __v->items[__i];
+        if (__e.data != NULL) {
+            json_write_str(__b, __e);
+        } else {
+            json_write_null(__b);
+        }
+    }
+    tlang_buf_putc(__b, ']');
+}
+
+static bool tlj_parse_Profile(tlang_fiber* __fib, const char** __p, const char* __end, tl_Profile* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 2 && memcmp(__key.data, "id", 2) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_id)) return false;
+            __seen |= UINT64_C(1) << 0;
+        } else if (__key.len == 4 && memcmp(__key.data, "name", 4) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_name)) return false;
+            __seen |= UINT64_C(1) << 1;
+        } else if (__key.len == 5 && memcmp(__key.data, "score", 5) == 0) {
+            if (!json_scan_float64(&__q, __end, &__out->f_score)) return false;
+            __seen |= UINT64_C(1) << 2;
+        } else if (__key.len == 6 && memcmp(__key.data, "active", 6) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_active)) return false;
+            __seen |= UINT64_C(1) << 3;
+        } else if (__key.len == 4 && memcmp(__key.data, "nick", 4) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_nick = TLANG_STR_NULL;
+            } else {
+                if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_nick)) return false;
+            }
+            __seen |= UINT64_C(1) << 4;
+        } else if (__key.len == 3 && memcmp(__key.data, "age", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_age = TLANG_NONE(i32);
+            } else {
+                if (!json_scan_int32(&__q, __end, &__out->f_age.v)) return false;
+                __out->f_age.has = true;
+            }
+            __seen |= UINT64_C(1) << 5;
+        } else if (__key.len == 3 && memcmp(__key.data, "big", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_big = TLANG_NONE(i64);
+            } else {
+                if (!json_scan_int64(&__q, __end, &__out->f_big.v)) return false;
+                __out->f_big.has = true;
+            }
+            __seen |= UINT64_C(1) << 6;
+        } else if (__key.len == 5 && memcmp(__key.data, "ratio", 5) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_ratio = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_ratio.v)) return false;
+                __out->f_ratio.has = true;
+            }
+            __seen |= UINT64_C(1) << 7;
+        } else if (__key.len == 4 && memcmp(__key.data, "flag", 4) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_flag = TLANG_NONE(bool);
+            } else {
+                if (!json_scan_bool(&__q, __end, &__out->f_flag.v)) return false;
+                __out->f_flag.has = true;
+            }
+            __seen |= UINT64_C(1) << 8;
+        } else if (__key.len == 4 && memcmp(__key.data, "home", 4) == 0) {
+            tl_Address* __o = (tl_Address*)tlang_alloc_zeroed(__fib, sizeof(tl_Address));
+            if (!tlj_parse_Address(__fib, &__q, __end, __o, __depth + 1)) return false;
+            __out->f_home = __o;
+            __seen |= UINT64_C(1) << 9;
+        } else if (__key.len == 4 && memcmp(__key.data, "work", 4) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_work = NULL;
+            } else {
+                tl_Address* __o = (tl_Address*)tlang_alloc_zeroed(__fib, sizeof(tl_Address));
+                if (!tlj_parse_Address(__fib, &__q, __end, __o, __depth + 1)) return false;
+                __out->f_work = __o;
+            }
+            __seen |= UINT64_C(1) << 10;
+        } else if (__key.len == 4 && memcmp(__key.data, "tags", 4) == 0) {
+            tlang_slice_Tag* __a = NULL;
+            if (!tlj_parse_arr_Tag(__fib, &__q, __end, &__a, __depth + 1)) return false;
+            __out->f_tags = __a;
+            __seen |= UINT64_C(1) << 11;
+        } else if (__key.len == 6 && memcmp(__key.data, "labels", 6) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_labels = NULL;
+            } else {
+                tlang_slice_str* __a = NULL;
+                if (!tlj_parse_arr_str(__fib, &__q, __end, &__a, __depth + 1)) return false;
+                __out->f_labels = __a;
+            }
+            __seen |= UINT64_C(1) << 12;
+        } else if (__key.len == 6 && memcmp(__key.data, "matrix", 6) == 0) {
+            tlang_slice_arr_i64* __a = NULL;
+            if (!tlj_parse_arr_arr_i64(__fib, &__q, __end, &__a, __depth + 1)) return false;
+            __out->f_matrix = __a;
+            __seen |= UINT64_C(1) << 13;
+        } else if (__key.len == 9 && memcmp(__key.data, "maybeTags", 9) == 0) {
+            tlang_slice_opt_Tag* __a = NULL;
+            if (!tlj_parse_arr_opt_Tag(__fib, &__q, __end, &__a, __depth + 1)) return false;
+            __out->f_maybeTags = __a;
+            __seen |= UINT64_C(1) << 14;
+        } else if (__key.len == 5 && memcmp(__key.data, "notes", 5) == 0) {
+            tlang_slice_opt_str* __a = NULL;
+            if (!tlj_parse_arr_opt_str(__fib, &__q, __end, &__a, __depth + 1)) return false;
+            __out->f_notes = __a;
+            __seen |= UINT64_C(1) << 15;
+        } else if (__key.len == 5 && memcmp(__key.data, "small", 5) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_small)) return false;
+            __seen |= UINT64_C(1) << 16;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0x1ea0f)) == UINT64_C(0x1ea0f);
+}
+
+static void tlj_write_Profile(tlang_fiber* __fib, tlang_buf* __b, tl_Profile* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"id\":");
+    json_write_i64(__b, __v->f_id);
+    TLANG_BUF_PUT_LIT(__b, ",\"name\":");
+    json_write_str(__b, __v->f_name);
+    TLANG_BUF_PUT_LIT(__b, ",\"score\":");
+    json_write_f64(__b, __v->f_score);
+    TLANG_BUF_PUT_LIT(__b, ",\"active\":");
+    json_write_bool(__b, __v->f_active);
+    TLANG_BUF_PUT_LIT(__b, ",\"nick\":");
+    if (__v->f_nick.data != NULL) {
+        json_write_str(__b, __v->f_nick);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"age\":");
+    if (__v->f_age.has) {
+        json_write_i32(__b, __v->f_age.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"big\":");
+    if (__v->f_big.has) {
+        json_write_i64(__b, __v->f_big.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"ratio\":");
+    if (__v->f_ratio.has) {
+        json_write_f64(__b, __v->f_ratio.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"flag\":");
+    if (__v->f_flag.has) {
+        json_write_bool(__b, __v->f_flag.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"home\":");
+    tlj_write_Address(__fib, __b, __v->f_home);
+    TLANG_BUF_PUT_LIT(__b, ",\"work\":");
+    if (__v->f_work != NULL) {
+        tlj_write_Address(__fib, __b, __v->f_work);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"tags\":");
+    tlj_write_arr_Tag(__fib, __b, __v->f_tags);
+    TLANG_BUF_PUT_LIT(__b, ",\"labels\":");
+    if (__v->f_labels != NULL) {
+        tlj_write_arr_str(__fib, __b, __v->f_labels);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"matrix\":");
+    tlj_write_arr_arr_i64(__fib, __b, __v->f_matrix);
+    TLANG_BUF_PUT_LIT(__b, ",\"maybeTags\":");
+    tlj_write_arr_opt_Tag(__fib, __b, __v->f_maybeTags);
+    TLANG_BUF_PUT_LIT(__b, ",\"notes\":");
+    tlj_write_arr_opt_str(__fib, __b, __v->f_notes);
+    TLANG_BUF_PUT_LIT(__b, ",\"small\":");
+    json_write_i32(__b, __v->f_small);
+    tlang_buf_putc(__b, '}');
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tl_Profile* l_p;
+    tl_Profile* __t1 = (tl_Profile*)tlang_alloc_zeroed(__fib, sizeof(tl_Profile));
+    __t1->f_home = (tl_Address*)tlang_alloc_zeroed(__fib, sizeof(tl_Address));
+    __t1->f_tags = TLANG_SLICE_NEW(__fib, Tag);
+    __t1->f_matrix = TLANG_SLICE_NEW(__fib, arr_i64);
+    __t1->f_maybeTags = TLANG_SLICE_NEW(__fib, opt_Tag);
+    __t1->f_notes = TLANG_SLICE_NEW(__fib, opt_str);
+    l_p = __t1;
+    const char* __jp2 = l_ctx->body.data;
+    const char* __je2 = __jp2 + l_ctx->body.len;
+    bool __t3 = tlj_parse_Profile(__fib, &__jp2, __je2, l_p, 0) && json_skip_ws(__jp2, __je2) == __je2;
+    if (!__t3) {
+        tlang_ctx_text(__fib, l_ctx, 400, TLANG_STR("bad"));
+        return;
+    }
+    {
+        tlang_buf __b4;
+        tlang_buf_init(__fib, &__b4, 256);
+        tlj_write_Profile(__fib, &__b4, l_p);
+        tlang_ctx_json(__fib, l_ctx, 200, tlang_buf_string(&__b4));
+    }
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

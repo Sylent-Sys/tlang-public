@@ -1,0 +1,391 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+typedef struct tl_Wide tl_Wide;
+
+struct tl_Wide {
+    int64_t f_f0;
+    tlang_string f_f1;
+    bool f_f2;
+    tlang_opt_f64 f_f3;
+    int32_t f_f4;
+    int64_t f_f5;
+    tlang_string f_f6;
+    bool f_f7;
+    tlang_opt_f64 f_f8;
+    int32_t f_f9;
+    int64_t f_f10;
+    tlang_string f_f11;
+    bool f_f12;
+    tlang_opt_f64 f_f13;
+    int32_t f_f14;
+    int64_t f_f15;
+    tlang_string f_f16;
+    bool f_f17;
+    tlang_opt_f64 f_f18;
+    int32_t f_f19;
+    int64_t f_f20;
+    tlang_string f_f21;
+    bool f_f22;
+    tlang_opt_f64 f_f23;
+    int32_t f_f24;
+    int64_t f_f25;
+    tlang_string f_f26;
+    bool f_f27;
+    tlang_opt_f64 f_f28;
+    int32_t f_f29;
+    int64_t f_f30;
+    tlang_string f_f31;
+    bool f_f32;
+    tlang_opt_f64 f_f33;
+    int32_t f_f34;
+    int64_t f_f35;
+    tlang_string f_f36;
+    bool f_f37;
+    tlang_opt_f64 f_f38;
+    int32_t f_f39;
+};
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+static bool tlj_parse_Wide(tlang_fiber* __fib, const char** __p, const char* __end, tl_Wide* __out, int __depth);
+static void tlj_write_Wide(tlang_fiber* __fib, tlang_buf* __b, tl_Wide* __v);
+
+static bool tlj_parse_Wide(tlang_fiber* __fib, const char** __p, const char* __end, tl_Wide* __out, int __depth) {
+    const char* __q = *__p;
+    uint64_t __seen = 0;
+    if (__depth >= json_max_depth()) return false;
+    __q = json_skip_ws(__q, __end);
+    if (__q >= __end || *__q != '{') return false;
+    __q++;
+    __q = json_skip_ws(__q, __end);
+    if (__q < __end && *__q == '}') { __q++; goto __done; }
+    for (;;) {
+        tlang_string __key;
+        __q = json_skip_ws(__q, __end);
+        if (!json_scan_key(&__q, __end, &__key)) return false;
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end || *__q != ':') return false;
+        __q++;
+        __q = json_skip_ws(__q, __end);
+        if (__key.len == 2 && memcmp(__key.data, "f0", 2) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f0)) return false;
+            __seen |= UINT64_C(1) << 0;
+        } else if (__key.len == 2 && memcmp(__key.data, "f1", 2) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f1)) return false;
+            __seen |= UINT64_C(1) << 1;
+        } else if (__key.len == 2 && memcmp(__key.data, "f2", 2) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f2)) return false;
+            __seen |= UINT64_C(1) << 2;
+        } else if (__key.len == 2 && memcmp(__key.data, "f3", 2) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f3 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f3.v)) return false;
+                __out->f_f3.has = true;
+            }
+            __seen |= UINT64_C(1) << 3;
+        } else if (__key.len == 2 && memcmp(__key.data, "f4", 2) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f4)) return false;
+            __seen |= UINT64_C(1) << 4;
+        } else if (__key.len == 2 && memcmp(__key.data, "f5", 2) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f5)) return false;
+            __seen |= UINT64_C(1) << 5;
+        } else if (__key.len == 2 && memcmp(__key.data, "f6", 2) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f6)) return false;
+            __seen |= UINT64_C(1) << 6;
+        } else if (__key.len == 2 && memcmp(__key.data, "f7", 2) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f7)) return false;
+            __seen |= UINT64_C(1) << 7;
+        } else if (__key.len == 2 && memcmp(__key.data, "f8", 2) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f8 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f8.v)) return false;
+                __out->f_f8.has = true;
+            }
+            __seen |= UINT64_C(1) << 8;
+        } else if (__key.len == 2 && memcmp(__key.data, "f9", 2) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f9)) return false;
+            __seen |= UINT64_C(1) << 9;
+        } else if (__key.len == 3 && memcmp(__key.data, "f10", 3) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f10)) return false;
+            __seen |= UINT64_C(1) << 10;
+        } else if (__key.len == 3 && memcmp(__key.data, "f11", 3) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f11)) return false;
+            __seen |= UINT64_C(1) << 11;
+        } else if (__key.len == 3 && memcmp(__key.data, "f12", 3) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f12)) return false;
+            __seen |= UINT64_C(1) << 12;
+        } else if (__key.len == 3 && memcmp(__key.data, "f13", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f13 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f13.v)) return false;
+                __out->f_f13.has = true;
+            }
+            __seen |= UINT64_C(1) << 13;
+        } else if (__key.len == 3 && memcmp(__key.data, "f14", 3) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f14)) return false;
+            __seen |= UINT64_C(1) << 14;
+        } else if (__key.len == 3 && memcmp(__key.data, "f15", 3) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f15)) return false;
+            __seen |= UINT64_C(1) << 15;
+        } else if (__key.len == 3 && memcmp(__key.data, "f16", 3) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f16)) return false;
+            __seen |= UINT64_C(1) << 16;
+        } else if (__key.len == 3 && memcmp(__key.data, "f17", 3) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f17)) return false;
+            __seen |= UINT64_C(1) << 17;
+        } else if (__key.len == 3 && memcmp(__key.data, "f18", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f18 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f18.v)) return false;
+                __out->f_f18.has = true;
+            }
+            __seen |= UINT64_C(1) << 18;
+        } else if (__key.len == 3 && memcmp(__key.data, "f19", 3) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f19)) return false;
+            __seen |= UINT64_C(1) << 19;
+        } else if (__key.len == 3 && memcmp(__key.data, "f20", 3) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f20)) return false;
+            __seen |= UINT64_C(1) << 20;
+        } else if (__key.len == 3 && memcmp(__key.data, "f21", 3) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f21)) return false;
+            __seen |= UINT64_C(1) << 21;
+        } else if (__key.len == 3 && memcmp(__key.data, "f22", 3) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f22)) return false;
+            __seen |= UINT64_C(1) << 22;
+        } else if (__key.len == 3 && memcmp(__key.data, "f23", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f23 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f23.v)) return false;
+                __out->f_f23.has = true;
+            }
+            __seen |= UINT64_C(1) << 23;
+        } else if (__key.len == 3 && memcmp(__key.data, "f24", 3) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f24)) return false;
+            __seen |= UINT64_C(1) << 24;
+        } else if (__key.len == 3 && memcmp(__key.data, "f25", 3) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f25)) return false;
+            __seen |= UINT64_C(1) << 25;
+        } else if (__key.len == 3 && memcmp(__key.data, "f26", 3) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f26)) return false;
+            __seen |= UINT64_C(1) << 26;
+        } else if (__key.len == 3 && memcmp(__key.data, "f27", 3) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f27)) return false;
+            __seen |= UINT64_C(1) << 27;
+        } else if (__key.len == 3 && memcmp(__key.data, "f28", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f28 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f28.v)) return false;
+                __out->f_f28.has = true;
+            }
+            __seen |= UINT64_C(1) << 28;
+        } else if (__key.len == 3 && memcmp(__key.data, "f29", 3) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f29)) return false;
+            __seen |= UINT64_C(1) << 29;
+        } else if (__key.len == 3 && memcmp(__key.data, "f30", 3) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f30)) return false;
+            __seen |= UINT64_C(1) << 30;
+        } else if (__key.len == 3 && memcmp(__key.data, "f31", 3) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f31)) return false;
+            __seen |= UINT64_C(1) << 31;
+        } else if (__key.len == 3 && memcmp(__key.data, "f32", 3) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f32)) return false;
+            __seen |= UINT64_C(1) << 32;
+        } else if (__key.len == 3 && memcmp(__key.data, "f33", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f33 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f33.v)) return false;
+                __out->f_f33.has = true;
+            }
+            __seen |= UINT64_C(1) << 33;
+        } else if (__key.len == 3 && memcmp(__key.data, "f34", 3) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f34)) return false;
+            __seen |= UINT64_C(1) << 34;
+        } else if (__key.len == 3 && memcmp(__key.data, "f35", 3) == 0) {
+            if (!json_scan_int64(&__q, __end, &__out->f_f35)) return false;
+            __seen |= UINT64_C(1) << 35;
+        } else if (__key.len == 3 && memcmp(__key.data, "f36", 3) == 0) {
+            if (!json_scan_string(&__q, __end, __fib->arena, &__out->f_f36)) return false;
+            __seen |= UINT64_C(1) << 36;
+        } else if (__key.len == 3 && memcmp(__key.data, "f37", 3) == 0) {
+            if (!json_scan_bool(&__q, __end, &__out->f_f37)) return false;
+            __seen |= UINT64_C(1) << 37;
+        } else if (__key.len == 3 && memcmp(__key.data, "f38", 3) == 0) {
+            if (json_scan_null(&__q, __end)) {
+                __out->f_f38 = TLANG_NONE(f64);
+            } else {
+                if (!json_scan_float64(&__q, __end, &__out->f_f38.v)) return false;
+                __out->f_f38.has = true;
+            }
+            __seen |= UINT64_C(1) << 38;
+        } else if (__key.len == 3 && memcmp(__key.data, "f39", 3) == 0) {
+            if (!json_scan_int32(&__q, __end, &__out->f_f39)) return false;
+            __seen |= UINT64_C(1) << 39;
+        } else {
+            if (!json_skip_value(&__q, __end, __depth)) return false;
+        }
+        __q = json_skip_ws(__q, __end);
+        if (__q >= __end) return false;
+        if (*__q == ',') { __q++; continue; }
+        if (*__q == '}') { __q++; break; }
+        return false;
+    }
+    __done: ;
+    *__p = __q;
+    return (__seen & UINT64_C(0xbdef7bdef7)) == UINT64_C(0xbdef7bdef7);
+}
+
+static void tlj_write_Wide(tlang_fiber* __fib, tlang_buf* __b, tl_Wide* __v) {
+    TLANG_BUF_PUT_LIT(__b, "{\"f0\":");
+    json_write_i64(__b, __v->f_f0);
+    TLANG_BUF_PUT_LIT(__b, ",\"f1\":");
+    json_write_str(__b, __v->f_f1);
+    TLANG_BUF_PUT_LIT(__b, ",\"f2\":");
+    json_write_bool(__b, __v->f_f2);
+    TLANG_BUF_PUT_LIT(__b, ",\"f3\":");
+    if (__v->f_f3.has) {
+        json_write_f64(__b, __v->f_f3.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f4\":");
+    json_write_i32(__b, __v->f_f4);
+    TLANG_BUF_PUT_LIT(__b, ",\"f5\":");
+    json_write_i64(__b, __v->f_f5);
+    TLANG_BUF_PUT_LIT(__b, ",\"f6\":");
+    json_write_str(__b, __v->f_f6);
+    TLANG_BUF_PUT_LIT(__b, ",\"f7\":");
+    json_write_bool(__b, __v->f_f7);
+    TLANG_BUF_PUT_LIT(__b, ",\"f8\":");
+    if (__v->f_f8.has) {
+        json_write_f64(__b, __v->f_f8.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f9\":");
+    json_write_i32(__b, __v->f_f9);
+    TLANG_BUF_PUT_LIT(__b, ",\"f10\":");
+    json_write_i64(__b, __v->f_f10);
+    TLANG_BUF_PUT_LIT(__b, ",\"f11\":");
+    json_write_str(__b, __v->f_f11);
+    TLANG_BUF_PUT_LIT(__b, ",\"f12\":");
+    json_write_bool(__b, __v->f_f12);
+    TLANG_BUF_PUT_LIT(__b, ",\"f13\":");
+    if (__v->f_f13.has) {
+        json_write_f64(__b, __v->f_f13.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f14\":");
+    json_write_i32(__b, __v->f_f14);
+    TLANG_BUF_PUT_LIT(__b, ",\"f15\":");
+    json_write_i64(__b, __v->f_f15);
+    TLANG_BUF_PUT_LIT(__b, ",\"f16\":");
+    json_write_str(__b, __v->f_f16);
+    TLANG_BUF_PUT_LIT(__b, ",\"f17\":");
+    json_write_bool(__b, __v->f_f17);
+    TLANG_BUF_PUT_LIT(__b, ",\"f18\":");
+    if (__v->f_f18.has) {
+        json_write_f64(__b, __v->f_f18.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f19\":");
+    json_write_i32(__b, __v->f_f19);
+    TLANG_BUF_PUT_LIT(__b, ",\"f20\":");
+    json_write_i64(__b, __v->f_f20);
+    TLANG_BUF_PUT_LIT(__b, ",\"f21\":");
+    json_write_str(__b, __v->f_f21);
+    TLANG_BUF_PUT_LIT(__b, ",\"f22\":");
+    json_write_bool(__b, __v->f_f22);
+    TLANG_BUF_PUT_LIT(__b, ",\"f23\":");
+    if (__v->f_f23.has) {
+        json_write_f64(__b, __v->f_f23.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f24\":");
+    json_write_i32(__b, __v->f_f24);
+    TLANG_BUF_PUT_LIT(__b, ",\"f25\":");
+    json_write_i64(__b, __v->f_f25);
+    TLANG_BUF_PUT_LIT(__b, ",\"f26\":");
+    json_write_str(__b, __v->f_f26);
+    TLANG_BUF_PUT_LIT(__b, ",\"f27\":");
+    json_write_bool(__b, __v->f_f27);
+    TLANG_BUF_PUT_LIT(__b, ",\"f28\":");
+    if (__v->f_f28.has) {
+        json_write_f64(__b, __v->f_f28.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f29\":");
+    json_write_i32(__b, __v->f_f29);
+    TLANG_BUF_PUT_LIT(__b, ",\"f30\":");
+    json_write_i64(__b, __v->f_f30);
+    TLANG_BUF_PUT_LIT(__b, ",\"f31\":");
+    json_write_str(__b, __v->f_f31);
+    TLANG_BUF_PUT_LIT(__b, ",\"f32\":");
+    json_write_bool(__b, __v->f_f32);
+    TLANG_BUF_PUT_LIT(__b, ",\"f33\":");
+    if (__v->f_f33.has) {
+        json_write_f64(__b, __v->f_f33.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f34\":");
+    json_write_i32(__b, __v->f_f34);
+    TLANG_BUF_PUT_LIT(__b, ",\"f35\":");
+    json_write_i64(__b, __v->f_f35);
+    TLANG_BUF_PUT_LIT(__b, ",\"f36\":");
+    json_write_str(__b, __v->f_f36);
+    TLANG_BUF_PUT_LIT(__b, ",\"f37\":");
+    json_write_bool(__b, __v->f_f37);
+    TLANG_BUF_PUT_LIT(__b, ",\"f38\":");
+    if (__v->f_f38.has) {
+        json_write_f64(__b, __v->f_f38.v);
+    } else {
+        json_write_null(__b);
+    }
+    TLANG_BUF_PUT_LIT(__b, ",\"f39\":");
+    json_write_i32(__b, __v->f_f39);
+    tlang_buf_putc(__b, '}');
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    tl_Wide* l_w;
+    l_w = (tl_Wide*)tlang_alloc_zeroed(__fib, sizeof(tl_Wide));
+    const char* __jp1 = l_ctx->body.data;
+    const char* __je1 = __jp1 + l_ctx->body.len;
+    bool __t2 = tlj_parse_Wide(__fib, &__jp1, __je1, l_w, 0) && json_skip_ws(__jp1, __je1) == __je1;
+    if (!__t2) {
+        tlang_ctx_text(__fib, l_ctx, 400, TLANG_STR("bad"));
+        return;
+    }
+    {
+        tlang_buf __b3;
+        tlang_buf_init(__fib, &__b3, 256);
+        tlj_write_Wide(__fib, &__b3, l_w);
+        tlang_ctx_json(__fib, l_ctx, 200, tlang_buf_string(&__b3));
+    }
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

@@ -1,0 +1,73 @@
+{
+  "name": "tlang",
+  "displayName": "TLang",
+  "description": "Language support for TLang (.tlang) backed by the tlang-lsp language server.",
+  "version": "0.2.0",
+  "publisher": "tlang",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sylent-Sys/tlang.git",
+    "directory": "editors/vscode"
+  },
+  "homepage": "https://github.com/Sylent-Sys/tlang#readme",
+  "bugs": {
+    "url": "https://github.com/Sylent-Sys/tlang/issues"
+  },
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:tlang"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "tlang",
+        "aliases": [
+          "TLang",
+          "tlang"
+        ],
+        "extensions": [
+          ".tlang"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tlang",
+        "scopeName": "source.tlang",
+        "path": "./syntaxes/tlang.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "TLang",
+      "properties": {
+        "tlang.lsp.path": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the tlang-lsp server binary. When empty, the extension uses the tlang-lsp bundled with a platform-specific package, else `tlang-lsp` resolved from PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.9",
+    "@types/vscode": "1.82.0",
+    "@vscode/vsce": "3.9.2",
+    "typescript": "5.4.5"
+  }
+}

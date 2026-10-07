@@ -1,0 +1,79 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+tlang_error tl_f_mkErr(tlang_fiber* __fib, int32_t l_code);
+void tl_f_thrower(tlang_fiber* __fib, int64_t l_kind, tlang_string l_s);
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+
+tlang_error tl_f_mkErr(tlang_fiber* __fib, int32_t l_code) {
+    return tlang_error_make(TLANG_STR("made"), l_code);
+}
+
+void tl_f_thrower(tlang_fiber* __fib, int64_t l_kind, tlang_string l_s) {
+    if (l_kind == 0) {
+        tlang_throw(__fib, 500, TLANG_STR("plain"));
+        goto __fail;
+    }
+    if (l_kind == 1) {
+        tlang_throw(__fib, 500, TLANG_STR("one"));
+        goto __fail;
+    }
+    if (l_kind == 2) {
+        tlang_throw(__fib, 418, TLANG_STR("two"));
+        goto __fail;
+    }
+    if (l_kind == 3) {
+        tlang_error l_e;
+        l_e = tlang_error_make(TLANG_STR("three"), 401);
+        tlang_throw_value(__fib, l_e);
+        goto __fail;
+    }
+    if (l_kind == 4) {
+        tlang_error __t1 = tl_f_mkErr(__fib, 503);
+        if (__fib->err) goto __fail;
+        tlang_throw_value(__fib, __t1);
+        goto __fail;
+    }
+    if (l_kind == 5) {
+        tlang_throw(__fib, 409, TLANG_STR("global"));
+        goto __fail;
+    }
+    tlang_throw(__fib, 500, tlang_str_concat(__fib, TLANG_STR("dynamic: "), l_s));
+    goto __fail;
+    __fail: ;
+    return;
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    {
+        tl_f_thrower(__fib, 1, TLANG_STR("x"));
+        if (__fib->err) goto __tlang_catch_1;
+        goto __tlang_try_end_1;
+    }
+    __tlang_catch_1: ;
+    {
+        tlang_error l_e;
+        l_e = tlang_take_error(__fib);
+        tlang_throw_value(__fib, l_e);
+        goto __fail;
+    }
+    __tlang_try_end_1: ;
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }

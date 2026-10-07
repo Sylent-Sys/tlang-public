@@ -1,0 +1,71 @@
+#include "tlang.h"
+
+#if defined(__clang__)
+#pragma clang diagnostic ignored "-Wself-assign"
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wtautological-compare"
+#endif
+
+bool tl_f_check(tlang_fiber* __fib, bool l_b);
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx);
+
+static const tlang_route __tl_r2 = { TLANG_STR_INIT("GET"), NULL, 0, 0 };
+
+static const tlang_route_seg __tl_r3_segs[4] = {
+    { TLANG_SEG_STATIC, TLANG_STR_INIT("users") },
+    { TLANG_SEG_PARAM, TLANG_STR_INIT("id") },
+    { TLANG_SEG_STATIC, TLANG_STR_INIT("posts") },
+    { TLANG_SEG_PARAM, TLANG_STR_INIT("post") }
+};
+static const tlang_route __tl_r3 = { TLANG_STR_INIT("GET"), __tl_r3_segs, 4, 2 };
+
+static const tlang_route_seg __tl_r4_segs[2] = {
+    { TLANG_SEG_STATIC, TLANG_STR_INIT("a\\b") },
+    { TLANG_SEG_STATIC, TLANG_STR_INIT("\"q\"") }
+};
+static const tlang_route __tl_r4 = { TLANG_STR_INIT("POST"), __tl_r4_segs, 2, 0 };
+
+static const tlang_route_seg __tl_r6_segs[2] = {
+    { TLANG_SEG_STATIC, TLANG_STR_INIT("api") },
+    { TLANG_SEG_STATIC, TLANG_STR_INIT("items") }
+};
+static const tlang_route __tl_r6 = { TLANG_STR_INIT("DELETE"), __tl_r6_segs, 2, 0 };
+
+bool tl_f_check(tlang_fiber* __fib, bool l_b) {
+    return l_b;
+}
+
+void tl_f_route_dispatcher(tlang_fiber* __fib, tlang_ctx* l_ctx) {
+    if (tlang_ctx_match(l_ctx, &__tl_r2)) {
+        tlang_ctx_text(__fib, l_ctx, 200, TLANG_STR("root"));
+        return;
+    }
+    if (tlang_ctx_match(l_ctx, &__tl_r3)) {
+        tlang_ctx_text(__fib, l_ctx, 200, tlang_str_concat(__fib, tlang_ctx_param(l_ctx, TLANG_STR("id")), tlang_ctx_param(l_ctx, TLANG_STR("post"))));
+        return;
+    }
+    if (tlang_ctx_match(l_ctx, &__tl_r4)) {
+        tlang_ctx_text(__fib, l_ctx, 201, TLANG_STR("escaped"));
+        return;
+    }
+    bool __t1 = tl_f_check(__fib, tlang_ctx_match(l_ctx, &__tl_r6));
+    if (__fib->err) goto __fail;
+    if (__t1) {
+        tlang_ctx_text(__fib, l_ctx, 204, TLANG_STR(""));
+        return;
+    }
+    tlang_ctx_text(__fib, l_ctx, 404, TLANG_STR("nope"));
+    return;
+    __fail: ;
+    return;
+}
+
+static const tlang_program __tl_program = {
+    .init_globals = NULL,
+    .globals_size = 0,
+    .dispatcher   = tl_f_route_dispatcher,
+    .main         = NULL,
+    .uses_db      = false,
+};
+int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }
