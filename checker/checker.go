@@ -211,7 +211,8 @@ type funcDecl struct {
 // entry.go) are the cross-cutting analyses, with @Use guard resolution run
 // between pass 3 and pass 4 so the may-fail fixed point sees the guards.
 func (c *checker) run(prog *ast.Program) {
-	c.collectNames(prog)  // pass 1
+	c.collectNames(prog) // pass 1
+	c.declareStandaloneStandardImports(prog)
 	c.resolveSignatures() // pass 2
 	c.checkBodies(prog)   // pass 3 (FEAT-002)
 	// Passes 4-6 are cross-cutting. They read the model pass 3 built and each
@@ -228,6 +229,43 @@ func (c *checker) run(prog *ast.Program) {
 	// 8): the authoritative check now lives here, with codegen's nameTable as
 	// a defensive backstop.
 	c.checkCNameCollisions()
+}
+
+// declareStandaloneStandardImports gives parser/checker unit users the same
+// virtual-module bindings as CheckProgram without resolving source imports.
+func (c *checker) declareStandaloneStandardImports(prog *ast.Program) {
+	mc := &moduleCtx{scope: c.global, importTable: map[string]types.Object{}}
+	for _, stmt := range prog.Statements {
+		imp, ok := stmt.(*ast.ImportDecl)
+		if !ok {
+			continue
+		}
+		m, known := module.LookupStandardModule(imp.From)
+		if !known {
+			if imp.From == "tlang" || len(imp.From) >= len("tlang/") && imp.From[:len("tlang/")] == "tlang/" {
+				c.errorf(imp.FromPos, "E-IMPORT", "standard module %q is not available", imp.From)
+			}
+			continue
+		}
+		if !m.Available {
+			c.errorf(imp.FromPos, "E-IMPORT", "standard module %q is not available", imp.From)
+			continue
+		}
+		target := importTarget{standard: m}
+		for _, spec := range imp.Named {
+			if standardExportObject(m, spec.Name.Name) == nil {
+				c.errorf(spec.Name.NamePos, "E-IMPORT", "no exported member %s in %s", spec.Name.Name, imp.From)
+			}
+		}
+		if imp.Default != nil {
+			c.errorf(imp.Default.NamePos, "E-IMPORT", "module %q has no default export", imp.From)
+		}
+		if imp.Namespace != nil {
+			c.bindNamespaceImport(mc, imp, target)
+		} else {
+			c.bindNamedImports(mc, imp, target)
+		}
+	}
 }
 
 // scopeTag returns the mangling tag of a module scope: "" for the

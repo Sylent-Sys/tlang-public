@@ -128,6 +128,11 @@ void tlang_console_log(tlang_fiber* fib, const tlang_value* args, int nargs) {
     console_write(STDOUT_FILENO, args, nargs);
 }
 
+void tlang_console_info(tlang_fiber* fib, const tlang_value* args, int nargs) {
+    (void)fib;
+    console_write(STDOUT_FILENO, args, nargs);
+}
+
 void tlang_console_error(tlang_fiber* fib, const tlang_value* args, int nargs) {
     (void)fib;
     console_write(STDERR_FILENO, args, nargs);

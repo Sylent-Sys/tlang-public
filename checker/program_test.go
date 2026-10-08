@@ -10,6 +10,16 @@ import (
 	"tlang/types"
 )
 
+func TestVirtualImportsAndNestedNamespace(t *testing.T) {
+	info, codes := checkProgram(t, map[string]string{"main.ts": `import * as system from "tlang/system"; fn main(): void { system.console.info("ok"); }`}, "main.ts")
+	if len(codes) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes)
+	}
+	if len(info.Calls) != 1 {
+		t.Fatalf("calls = %d, want one builtin call", len(info.Calls))
+	}
+}
+
 // checkProgram writes files into a temp dir, builds the module graph rooted
 // at root, and runs CheckProgram. It fails the test on a graph-build error
 // (unresolved specifier, lex/parse error) so a semantic test never masks a

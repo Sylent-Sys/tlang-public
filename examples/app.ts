@@ -1,3 +1,6 @@
+import { db } from "tlang/db";
+
+
 interface CreateUserReq {
     id: int64;
     name: string;

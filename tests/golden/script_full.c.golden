@@ -41,14 +41,14 @@ void tl_f_main(tlang_fiber* __fib) {
         int64_t __t1 = tl_f_bump(__fib, l_i);
         if (__fib->err) goto __fail;
         tlang_slice_str* __t2 = __fib->globals->g_counter->f_names;
-        tlang_console_log(__fib, (tlang_value[3]){ TLANG_VAL_STR(TLANG_STR("hit")), TLANG_VAL_I64(__t1), TLANG_VAL_I64(__t2->len) }, 3);
+        tlang_console_info(__fib, (tlang_value[3]){ TLANG_VAL_STR(TLANG_STR("hit")), TLANG_VAL_I64(__t1), TLANG_VAL_I64(__t2->len) }, 3);
         l_i = tlang_add_i64(l_i, 1);
     }
     tlang_slice_str* __t3 = __fib->globals->g_counter->f_names;
     for (int64_t __i4 = 0; __i4 < __t3->len; __i4++) {
         tlang_string l_name;
         l_name = __t3->items[__i4];
-        tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR(l_name) }, 1);
+        tlang_console_info(__fib, (tlang_value[1]){ TLANG_VAL_STR(l_name) }, 1);
     }
     return;
     __fail: ;

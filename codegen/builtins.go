@@ -57,6 +57,8 @@ func (fc *funcCtx) callBuiltin(e *ast.CallExpression, c *types.Call, discard boo
 		return fc.toString(e, c, "tlang_bool_to_string", discard)
 	case types.BuiltinConsoleLog:
 		return fc.consoleBuiltin(e, c, "tlang_console_log")
+	case types.BuiltinConsoleInfo:
+		return fc.consoleBuiltin(e, c, "tlang_console_info")
 	case types.BuiltinConsoleError:
 		return fc.consoleBuiltin(e, c, "tlang_console_error")
 	case types.BuiltinCtxHeader:

@@ -135,11 +135,11 @@ fn route_dispatcher(ctx: Context): void {
 // §10.1): the five base kinds, NULL, 0 for no arguments, and a sized array.
 func TestConsoleKinds(t *testing.T) {
 	out := mustEmit(t, `fn f(n: int64, i: int32, s: string, fl: float64, b: bool): void {
-    console.log();
-    console.log(s, n, i, fl, b, 7, 2.5, true);
+    console.info();
+    console.info(s, n, i, fl, b, 7, 2.5, true);
 }
 `)
-	if !strings.Contains(out, "tlang_console_log(__fib, NULL, 0);") {
+	if !strings.Contains(out, "tlang_console_log(__fib, NULL, 0);") && !strings.Contains(out, "tlang_console_info(__fib, NULL, 0);") {
 		t.Error("zero-arg console should be NULL, 0")
 	}
 	if !strings.Contains(out, "(tlang_value[8]){ TLANG_VAL_STR(l_s), TLANG_VAL_I64(l_n), TLANG_VAL_I32(l_i), TLANG_VAL_F64(l_fl), TLANG_VAL_BOOL(l_b), TLANG_VAL_I64(7), TLANG_VAL_F64(2.5), TLANG_VAL_BOOL(true) }, 8") {

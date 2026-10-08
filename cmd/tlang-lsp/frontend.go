@@ -29,8 +29,8 @@ type analysis struct {
 // runFrontend: checker.Check always runs, even after parse errors (the tree is
 // walkable), and the parser/lexer diagnostics are concatenated before the
 // checker's, in that order. It never reads from disk. The server uses it for
-// documents without a file: URI (untitled buffers), where imports cannot be
-// resolved.
+// documents without a file: URI (untitled buffers); Check binds registered
+// virtual standard imports while source imports remain unresolved there.
 func analyze(uri, text string) analysis {
 	src := []byte(text)
 	prog, parseDiags := parser.ParseSource(fileName(uri), src)
@@ -96,16 +96,16 @@ func documentDiagnostics(graph *module.Graph, buildDiags, checkDiags []diag.Diag
 		}
 	}
 	for _, e := range root.Imports {
-		if e.Target == nil {
+		if e.Target.Kind != module.ImportTargetSource || e.Target.Source == nil {
 			continue // unresolved: already an E-IMPORT of this document
 		}
-		bad := firstBroken(e.Target, root, broken)
+		bad := firstBroken(e.Target.Source, root, broken)
 		if bad == nil {
 			continue
 		}
-		msg := fmt.Sprintf("imported module %q has errors", e.Target.ID)
-		if bad != e.Target {
-			msg = fmt.Sprintf("imported module %q depends on %q, which has errors", e.Target.ID, bad.ID)
+		msg := fmt.Sprintf("imported module %q has errors", e.Target.Source.ID)
+		if bad != e.Target.Source {
+			msg = fmt.Sprintf("imported module %q depends on %q, which has errors", e.Target.Source.ID, bad.ID)
 		}
 		out = append(out, diag.Diagnostic{File: root.ID, Pos: e.Pos, Severity: diag.Error, Code: "E-IMPORT", Message: msg})
 	}
@@ -134,8 +134,8 @@ func firstBroken(m, root *module.Module, broken map[string]bool) *module.Module 
 			return m
 		}
 		for _, e := range m.Imports {
-			if e.Target != nil {
-				if b := walk(e.Target); b != nil {
+			if e.Target.Kind == module.ImportTargetSource && e.Target.Source != nil {
+				if b := walk(e.Target.Source); b != nil {
 					return b
 				}
 			}

@@ -157,18 +157,18 @@ func TestUniverse(t *testing.T) {
 			t.Errorf("universe type %s = %v", name, LookupUniverse(name))
 		}
 	}
-	if b, ok := LookupUniverse("db").(*Builtin); !ok || b.ID != BuiltinDB || b.ObjectType() != nil {
-		t.Error("universe db")
+	if LookupUniverse("db") != nil {
+		t.Error("db must not be in universe")
 	}
-	if b, ok := LookupUniverse("console").(*Builtin); !ok || b.ID != BuiltinConsole {
-		t.Error("universe console")
+	if LookupUniverse("console") != nil {
+		t.Error("console must not be in universe")
 	}
 	for _, name := range []string{"null", "true", "number", "any", "Use"} {
 		if LookupUniverse(name) != nil {
 			t.Errorf("%s must not be in the universe", name)
 		}
 	}
-	if got := strings.Join(UniverseNames(), " "); got != "Context Error Transaction bool console db float64 int32 int64 string void" {
+	if got := strings.Join(UniverseNames(), " "); got != "Context Error Transaction bool float64 int32 int64 string void" {
 		t.Errorf("UniverseNames = %s", got)
 	}
 	if LookupUniverse("int32").(*TypeName).Type != Typ[Int32] {

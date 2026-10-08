@@ -38,7 +38,7 @@ func TestCompletePlainTopLevel(t *testing.T) {
 
 func TestCompleteMemberNamespace(t *testing.T) {
 	// "db." with nothing after the dot: resolved via the identifier text.
-	src := "fn main(): void {\n\tdb.\n}\n"
+	src := "import { db } from \"tlang/db\";\nfn main(): void {\n\tdb.\n}\n"
 	a := analyze("file:///app.tlang", src)
 	offset := strings.Index(src, "db.") + len("db.")
 	items := complete(a.info, a.prog, a.src, offset)
@@ -81,7 +81,7 @@ func TestCompleteMemberOptionalReceiver(t *testing.T) {
 // builtins table fails the build.
 func TestProbeListDriftGuard(t *testing.T) {
 	for _, name := range consoleMembers {
-		if types.NamespaceMember(types.BuiltinConsole, name) == types.BuiltinInvalid {
+		if types.StandardNamespaceMember(types.BuiltinConsole, name) == types.BuiltinInvalid {
 			t.Errorf("consoleMembers: %q does not resolve", name)
 		}
 	}

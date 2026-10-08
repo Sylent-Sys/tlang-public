@@ -63,8 +63,8 @@ func (mc *moduleContext) target(mod *module.Module, spec string) *module.Module 
 		return nil
 	}
 	for _, e := range mod.Imports {
-		if e.Spec == spec && e.Target != nil {
-			return e.Target
+		if e.Spec == spec && e.Target.Kind == module.ImportTargetSource {
+			return e.Target.Source
 		}
 	}
 	return nil
@@ -288,7 +288,10 @@ func (mc *moduleContext) resolveSpec(spec string) *module.Module {
 	if g.Root == nil || len(g.Root.Imports) == 0 {
 		return nil
 	}
-	return g.Root.Imports[0].Target
+	if g.Root.Imports[0].Target.Kind != module.ImportTargetSource {
+		return nil
+	}
+	return g.Root.Imports[0].Target.Source
 }
 
 // probeFS serves the probe module's text and delegates everything else.

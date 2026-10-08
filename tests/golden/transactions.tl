@@ -1,3 +1,7 @@
+import { db } from "tlang/db";
+import { console } from "tlang/system";
+
+
 fn div(a: int64, b: int64): int64 {
     return a / b;
 }

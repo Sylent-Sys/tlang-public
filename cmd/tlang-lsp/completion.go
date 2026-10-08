@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"strings"
 
 	"tlang/ast"
 	"tlang/module"
@@ -30,7 +31,7 @@ var decorators = []struct{ name, detail string }{
 // grouped by receiver. completion_test.go guards them: every name must resolve
 // to a non-invalid builtin, so a stale or mistyped entry fails the build.
 var (
-	consoleMembers = []string{"log", "error"}
+	consoleMembers = []string{"info", "error"}
 	dbMembers      = []string{"execute", "query", "queryOne", "transaction"}
 	txMembers      = []string{"execute", "query", "queryOne"}
 	stringMembers  = []string{"len", "eq", "slice", "startsWith", "endsWith",
@@ -443,9 +444,23 @@ func completeMember(mc *moduleContext, info *types.Info, prog *ast.Program, src 
 		if b, ok := info.Uses[recvID].(*types.Builtin); ok {
 			return namespaceItems(b.ID)
 		}
+		if obj := info.ObjectOf(recvID); obj != nil {
+			if b, ok := obj.(*types.Builtin); ok {
+				return namespaceItems(b.ID)
+			}
+		}
+	}
+	if strings.Contains(string(src[:dotOffset]), `"tlang/db"`) && recvText == "db" {
+		return namespaceItems(types.BuiltinDB)
+	}
+	if strings.Contains(string(src[:dotOffset]), `"tlang/system"`) && recvText == "console" {
+		return namespaceItems(types.BuiltinConsole)
 	}
 	if b, ok := types.LookupUniverse(recvText).(*types.Builtin); ok {
 		return namespaceItems(b.ID)
+	}
+	if mc == nil && recvText == "db" && strings.Contains(string(src[:dotOffset]), `"tlang/db"`) {
+		return namespaceItems(types.BuiltinDB)
 	}
 
 	var recv types.Type
@@ -482,7 +497,7 @@ func namespaceItems(ns types.BuiltinID) []CompletionItem {
 	}
 	var items []CompletionItem
 	for _, name := range names {
-		if id := types.NamespaceMember(ns, name); id != types.BuiltinInvalid {
+		if id := types.StandardNamespaceMember(ns, name); id != types.BuiltinInvalid {
 			items = append(items, CompletionItem{Label: name, Kind: completionKindFunction, Detail: id.String()})
 		}
 	}

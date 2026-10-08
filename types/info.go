@@ -38,6 +38,9 @@ const (
 	// target *Var and Type its value type, so codegen emits the target's
 	// tagged global name with no trace of the namespace.
 	SelModuleValue
+	// SelNamespace selects a compile-time-only namespace exported from a
+	// module namespace. Namespace holds the canonical selected object.
+	SelNamespace
 )
 
 // Selection is the resolution of one MemberExpression.
@@ -60,6 +63,8 @@ type Selection struct {
 	// builtins (s.len: int64, ctx.path: string); nil for methods, whose
 	// call result is in Info.Types of the CallExpression.
 	Type Type
+	// Namespace is the selected compile-time namespace for SelNamespace.
+	Namespace Object
 }
 
 // CallKind classifies a CallExpression.

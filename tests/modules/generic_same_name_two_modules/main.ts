@@ -1,3 +1,6 @@
+import { console } from "tlang/system";
+
+
 import { fromA } from "./a";
 
 fn id<T>(x: T): T {
@@ -7,5 +10,5 @@ fn id<T>(x: T): T {
 fn main(): void {
     let a = fromA();
     let b = id(2);
-    console.log(a + b);
+    console.info(a + b);
 }

@@ -68,7 +68,7 @@ static void body_log_mixed(void) {
 }
 
 static void body_log_empty(void) {
-    tlang_console_log(NULL, NULL, 0);
+    tlang_console_info(NULL, NULL, 0);
 }
 
 static char g_long_src[4096];

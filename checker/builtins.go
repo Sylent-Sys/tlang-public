@@ -31,6 +31,9 @@ func (c *checker) exprMember(sc *scope, e *ast.MemberExpression, facts factSet) 
 		return c.record(e, sel.Type, nil)
 	case types.SelModuleValue:
 		return c.record(e, sel.Type, nil)
+	case types.SelNamespace:
+		c.errorf(e.Property.NamePos, "E-TYPE", "%s is a namespace, not a value", e.Property.Name)
+		return c.invalid(e)
 	case types.SelBuiltin:
 		if sel.Type == nil {
 			c.errorf(e.Property.NamePos, "E-TYPE", "%s must be called", e.Property.Name)
@@ -54,13 +57,12 @@ func (c *checker) exprMember(sc *scope, e *ast.MemberExpression, facts factSet) 
 // callee-only builtins are valid). It returns the Selection, or nil on an
 // error that was reported.
 func (c *checker) resolveSelection(sc *scope, m *ast.MemberExpression, facts factSet, asCallee bool) *types.Selection {
-	// Namespace receiver: console / db, or a module namespace (import * as m).
-	if id, ok := m.Object.(*ast.Identifier); ok {
-		switch obj := sc.lookup(id.Name).(type) {
+	if obj, id := c.namespaceObject(sc, m.Object, facts); obj != nil {
+		switch ns := obj.(type) {
 		case *types.Builtin:
-			return c.selectNamespace(m, id, obj, asCallee)
+			return c.selectNamespace(m, id, ns, asCallee)
 		case *types.ModuleNS:
-			return c.selectModuleNS(m, id, obj, asCallee)
+			return c.selectModuleNS(m, id, ns, asCallee)
 		}
 	}
 
@@ -114,6 +116,30 @@ func (c *checker) resolveSelection(sc *scope, m *ast.MemberExpression, facts fac
 	return sel
 }
 
+func (c *checker) namespaceObject(sc *scope, e ast.Expression, facts factSet) (types.Object, *ast.Identifier) {
+	switch e := e.(type) {
+	case *ast.Identifier:
+		obj := sc.lookup(e.Name)
+		switch obj.(type) {
+		case *types.Builtin, *types.ModuleNS:
+			return obj, e
+		}
+	case *ast.MemberExpression:
+		sel := c.info.Selections[e]
+		if sel == nil {
+			sel = c.resolveSelection(sc, e, facts, false)
+		}
+		if sel != nil && sel.Kind == types.SelNamespace {
+			return sel.Namespace, nil
+		}
+		if sel != nil {
+			return nil, nil
+		}
+		return c.namespaceObject(sc, e.Object, facts)
+	}
+	return nil, nil
+}
+
 // selectModuleNS resolves a member of a module namespace binding ("m.X"
 // where m is "import * as m from ..."). It resolves X against ns's export set
 // (DESIGN-modules.md §9) with the FR-16 ("not exported") vs FR-17 ("no such
@@ -123,7 +149,9 @@ func (c *checker) resolveSelection(sc *scope, m *ast.MemberExpression, facts fac
 // export yields a receiver-less SelMethod (callMember lowers it to CallFunc);
 // a type export used in value position is E-TYPE.
 func (c *checker) selectModuleNS(m *ast.MemberExpression, id *ast.Identifier, ns *types.ModuleNS, asCallee bool) *types.Selection {
-	c.info.Uses[id] = ns
+	if id != nil {
+		c.info.Uses[id] = ns
+	}
 	target, ok := ns.Exports[m.Property.Name]
 	if !ok {
 		// FR-16 vs FR-17: a name that the module declares but does not export
@@ -137,6 +165,10 @@ func (c *checker) selectModuleNS(m *ast.MemberExpression, id *ast.Identifier, ns
 		return nil
 	}
 	switch obj := target.(type) {
+	case *types.Builtin, *types.ModuleNS:
+		sel := &types.Selection{Kind: types.SelNamespace, Namespace: obj}
+		c.info.Selections[m] = sel
+		return sel
 	case *types.Func:
 		// A receiver-less method selection: callMember lowers it to a direct
 		// CallFunc on the target, so codegen uses the target's tagged name.
@@ -157,12 +189,14 @@ func (c *checker) selectModuleNS(m *ast.MemberExpression, id *ast.Identifier, ns
 
 // selectNamespace resolves a member of the console or db namespace.
 func (c *checker) selectNamespace(m *ast.MemberExpression, id *ast.Identifier, b *types.Builtin, asCallee bool) *types.Selection {
-	member := types.NamespaceMember(b.ID, m.Property.Name)
+	member := types.StandardNamespaceMember(b.ID, m.Property.Name)
 	if member == types.BuiltinInvalid {
 		c.errorf(m.Property.NamePos, "E-TYPE", "%s has no member %s", b.Name, m.Property.Name)
 		return nil
 	}
-	c.info.Uses[id] = b
+	if id != nil {
+		c.info.Uses[id] = b
+	}
 	sel := &types.Selection{Kind: types.SelBuiltin, Builtin: member}
 	c.info.Selections[m] = sel
 	return sel
@@ -371,6 +405,8 @@ func (c *checker) callMember(sc *scope, e *ast.CallExpression, m *ast.MemberExpr
 		return c.callBuiltin(sc, e, m, sel, facts)
 	case types.SelModuleValue:
 		c.errorf(m.Property.NamePos, "E-TYPE", "%s is not callable", m.Property.Name)
+	case types.SelNamespace:
+		c.errorf(m.Property.NamePos, "E-TYPE", "%s is a namespace, not a callable value", m.Property.Name)
 	case types.SelField:
 		c.errorf(m.Property.NamePos, "E-TYPE", "field %s is not callable", m.Property.Name)
 	}

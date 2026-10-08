@@ -109,8 +109,10 @@ func BuildWith(rootPath string, opts BuildOptions) (*Graph, *diag.List) {
 			res, rerr := resolve(fsys, rootDir, p.dirID, spec.text)
 			if rerr != nil {
 				diags.Add(diag.Diagnostic{File: p.mod.ID, Pos: spec.pos, Severity: diag.Error, Code: codeImport, Message: rerr.Error()})
+			} else if res.standard != nil {
+				edge.Target = StandardImportTarget(res.standard)
 			} else {
-				edge.Target = parse(res.id, res.absPath, path.Dir(res.id))
+				edge.Target = SourceImportTarget(parse(res.id, res.absPath, path.Dir(res.id)))
 			}
 			p.mod.Imports = append(p.mod.Imports, edge)
 		}
@@ -176,12 +178,13 @@ func topoOrder(byID map[string]*Module, root *Module) []*Module {
 		m := byID[id]
 		seen := map[string]bool{}
 		for _, e := range m.Imports {
-			if e.Target == nil || e.Target.ID == id || seen[e.Target.ID] {
+			target := e.Target.Source
+			if e.Target.Kind != ImportTargetSource || target == nil || target.ID == id || seen[target.ID] {
 				continue
 			}
-			seen[e.Target.ID] = true
+			seen[target.ID] = true
 			remaining[id]++
-			importers[e.Target.ID] = append(importers[e.Target.ID], id)
+			importers[target.ID] = append(importers[target.ID], id)
 		}
 	}
 

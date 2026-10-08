@@ -76,7 +76,20 @@ const (
 	BuiltinTxQuery    // tx.query<T>(sql, args...): T[]
 	BuiltinTxQueryOne // tx.queryOne<T>(sql, args...): T | null
 
+	// Appended to preserve every existing BuiltinID numeric value.
+	BuiltinConsoleInfo // console.info(...): void
+
 	numBuiltins
+)
+
+// StandardExportDescriptor is a stable semantic bridge from the module
+// registry without importing module into types.
+type StandardExportDescriptor uint8
+
+const (
+	StandardExportNone StandardExportDescriptor = iota
+	StandardExportDatabase
+	StandardExportSystemConsole
 )
 
 // BuiltinRecv says what a builtin belongs to.
@@ -206,6 +219,8 @@ var builtins = [numBuiltins]BuiltinInfo{
 	BuiltinTxExecute:  {Name: "execute", Recv: RecvTransaction, Method: true, Fails: true, Allocates: true, Result: tInt64, Special: true},
 	BuiltinTxQuery:    {Name: "query", Recv: RecvTransaction, Method: true, Fails: true, Allocates: true, Special: true},
 	BuiltinTxQueryOne: {Name: "queryOne", Recv: RecvTransaction, Method: true, Fails: true, Allocates: true, Special: true},
+
+	BuiltinConsoleInfo: {Name: "info", Recv: RecvConsole, Method: true, Result: tVoid, Special: true},
 }
 
 // Info returns the table entry for id (the BuiltinInvalid entry for
@@ -290,6 +305,43 @@ func NamespaceMember(ns BuiltinID, name string) BuiltinID {
 		return lookupMember(RecvDB, name)
 	}
 	return BuiltinInvalid
+}
+
+// StandardNamespaceMember returns the source-visible member of an imported
+// standard namespace. Historical builtin IDs may remain available through
+// NamespaceMember for ABI/tooling compatibility without being source-visible.
+func StandardNamespaceMember(ns BuiltinID, name string) BuiltinID {
+	if ns == BuiltinConsole && name == "log" {
+		return BuiltinInvalid
+	}
+	return NamespaceMember(ns, name)
+}
+
+var standardDB = &Builtin{Name: "db", ID: BuiltinDB}
+var standardConsole = &Builtin{Name: "console", ID: BuiltinConsole}
+
+// StandardExportObject maps a stable front-end export descriptor to its
+// canonical semantic object.
+func StandardExportObject(id StandardExportDescriptor) Object {
+	switch id {
+	case StandardExportDatabase:
+		return standardDB
+	case StandardExportSystemConsole:
+		return standardConsole
+	}
+	return nil
+}
+
+// StandardBuiltin returns the canonical object exported by a standard
+// module. Repeated imports and re-exports preserve pointer identity.
+func StandardBuiltin(id BuiltinID) *Builtin {
+	switch id {
+	case BuiltinDB:
+		return standardDB
+	case BuiltinConsole:
+		return standardConsole
+	}
+	return nil
 }
 
 // ConversionOf returns the conversion builtin whose callee denotes type t

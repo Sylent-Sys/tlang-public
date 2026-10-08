@@ -13,11 +13,22 @@ import (
 // semantic test never silently masks a syntax mistake).
 func check(t *testing.T, src string) (*types.Info, *diag.List) {
 	t.Helper()
+	if !strings.Contains(src, "import") && (strings.Contains(src, "db.") || strings.Contains(src, "console.") || strings.Contains(src, "transaction(")) {
+		src = injectImports(src)
+	}
 	prog, pdiags := parser.ParseSource("test.tl", []byte(src))
 	if pdiags.HasErrors() {
 		t.Fatalf("parse %q: unexpected parser errors: %s", src, pdiags.Error())
 	}
 	return Check(prog)
+}
+
+func injectImports(src string) string {
+	imports := "import { db } from \"tlang/db\";\nimport { console } from \"tlang/system\";\n"
+	if i := strings.Index(src, "\n"); i >= 0 && strings.HasPrefix(src, "\n") {
+		return imports + src[1:]
+	}
+	return imports + src
 }
 
 // codesOf returns the diagnostic codes in sorted (deterministic) order.

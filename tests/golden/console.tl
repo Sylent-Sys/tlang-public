@@ -1,19 +1,22 @@
+import { console } from "tlang/system";
+
+
 fn div(a: int64, b: int64): int64 {
     return a / b;
 }
 
 fn logs(n: int64, s: string, o: int64 | null, i: int32, f: float64, b: bool): void {
-    console.log();
-    console.log("one");
-    console.log(s, n, i, f, b, 7, 2.5, true);
-    console.log(div(n, 2), s + "!", div(n, n));
+    console.info();
+    console.info("one");
+    console.info(s, n, i, f, b, 7, 2.5, true);
+    console.info(div(n, 2), s + "!", div(n, n));
     console.error("err", n);
     console.error();
     if (o != null) {
-        console.log(o);
+        console.info(o);
     }
-    console.log(o ?? 0);
-    console.log(i > int32(0) ? "pos" : "neg");
+    console.info(o ?? 0);
+    console.info(i > int32(0) ? "pos" : "neg");
 }
 
 fn main(): void {

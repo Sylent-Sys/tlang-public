@@ -766,6 +766,7 @@ static inline tlang_value tlang_val_opt_str(tlang_string s) {
  * thread for the duration of the write. Never fails: write errors are ignored.
  * fib may be NULL. */
 void tlang_console_log(tlang_fiber* fib, const tlang_value* args, int nargs);
+void tlang_console_info(tlang_fiber* fib, const tlang_value* args, int nargs);
 void tlang_console_error(tlang_fiber* fib, const tlang_value* args, int nargs);
 
 /* ========================================================================

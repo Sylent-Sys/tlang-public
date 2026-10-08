@@ -68,11 +68,11 @@ let count: int64 = 0;
 fn greet(u: User): string { return u.name; }
 fn main(): void {
 	let u = new User();
-	console.log(greet(u));
+	console.info(greet(u));
 }
 `
 	single := mustEmit(t, src)
-	graphC := buildGraphC(t, map[string]string{"main.ts": src}, "main.ts")
+	graphC := buildGraphC(t, map[string]string{"main.ts": "import { console } from \"tlang/system\";\n" + src}, "main.ts")
 	if single != graphC {
 		t.Fatalf("single-file C differs between Check and CheckProgram paths:\n--- Check ---\n%s\n--- CheckProgram ---\n%s", single, graphC)
 	}

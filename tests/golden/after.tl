@@ -1,9 +1,12 @@
+import { console } from "tlang/system";
+
+
 fn allow(ctx: Context): bool {
     return true;
 }
 
 fn metric(ctx: Context): void {
-    console.log("done");
+    console.info("done");
 }
 
 fn audit(ctx: Context): void {

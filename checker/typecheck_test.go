@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"strings"
 	"testing"
 
 	"tlang/ast"
@@ -553,6 +554,9 @@ func localByName(t *testing.T, info *types.Info, name string) *types.Var {
 // expression lookups), the Info and the diagnostics.
 func checkProg(t *testing.T, src string) (*ast.Program, *types.Info, *diag.List) {
 	t.Helper()
+	if !strings.Contains(src, "import") && (strings.Contains(src, "db.") || strings.Contains(src, "console.") || strings.Contains(src, "transaction(")) {
+		src = injectImports(src)
+	}
 	prog, pdiags := parser.ParseSource("test.tl", []byte(src))
 	if pdiags.HasErrors() {
 		t.Fatalf("parse %q: unexpected parser errors: %s", src, pdiags.Error())

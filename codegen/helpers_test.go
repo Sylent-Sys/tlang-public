@@ -19,6 +19,11 @@ const testFile = "test.tl"
 // Info.
 func checkSrc(t *testing.T, src string) (*ast.Program, *types.Info) {
 	t.Helper()
+	if strings.Contains(src, "db.") || strings.Contains(src, "console.") || strings.Contains(src, "transaction(") {
+		if !strings.Contains(src, "import") {
+			src = "import { db } from \"tlang/db\";\nimport { console } from \"tlang/system\";\n" + src
+		}
+	}
 	prog, pdiags := parser.ParseSource(testFile, []byte(src))
 	if pdiags.HasErrors() {
 		t.Fatalf("parser errors:\n%s\nsource:\n%s", pdiags.Error(), src)

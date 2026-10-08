@@ -7,6 +7,33 @@ import (
 	"testing"
 )
 
+func TestStandardImportsStayVirtual(t *testing.T) {
+	root := filepath.Join(writeTree(t, map[string]string{"main.ts": `import { db } from "tlang/db"; fn main(): void {}`}), "main.ts")
+	g, diags := Build(root)
+	if diags.HasErrors() {
+		t.Fatal(diags.Error())
+	}
+	if len(g.Modules) != 1 || g.Root.Tag != "" {
+		t.Fatalf("virtual import changed source graph: modules=%d tag=%q", len(g.Modules), g.Root.Tag)
+	}
+	if len(g.Root.Imports) != 1 || g.Root.Imports[0].Target.Kind != ImportTargetStandard || g.Root.Imports[0].Target.Standard.ID != StandardDB {
+		t.Fatalf("unexpected virtual edge: %+v", g.Root.Imports)
+	}
+}
+
+func TestReservedStandardSpecifiersFailBeforeProbe(t *testing.T) {
+	for _, spec := range []string{"tlang", "tlang/", "tlang//db", "tlang/./db", "tlang/../db", "tlang/unknown"} {
+		if _, err := resolve(noProbeFS{}, ".", ".", spec); err == nil {
+			t.Errorf("resolve(%q) unexpectedly succeeded", spec)
+		}
+	}
+}
+
+type noProbeFS struct{}
+
+func (noProbeFS) ReadFile(string) ([]byte, error) { panic("unexpected read") }
+func (noProbeFS) IsFile(string) bool              { panic("unexpected probe") }
+
 // writeTree writes files (keyed by slash-relative path -> contents) under a
 // fresh temp dir and returns the dir.
 func writeTree(t *testing.T, files map[string]string) string {

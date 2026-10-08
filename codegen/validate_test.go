@@ -29,8 +29,8 @@ fn main(): void {
             break;
         });
         i++;
-    }
-}`, "test.tl:5:13: unsupported input: break leaves a transaction body"},
+}
+}`, "test.tl:6:13: unsupported input: break leaves a transaction body"},
 
 		{"continue leaves tx", `fn main(): void {
     for (let i = 0; i < 3; i++) {
@@ -38,7 +38,7 @@ fn main(): void {
             continue;
         });
     }
-}`, "test.tl:4:13: unsupported input: continue leaves a transaction body"},
+}`, "test.tl:5:13: unsupported input: continue leaves a transaction body"},
 
 		{"continue leaves tx from for-of", `fn main(): void {
     let xs: int64[] = [1, 2];
@@ -49,7 +49,7 @@ fn main(): void {
             }
         });
     }
-}`, "test.tl:6:17: unsupported input: continue leaves a transaction body"},
+}`, "test.tl:7:17: unsupported input: continue leaves a transaction body"},
 
 		{"break in a try leaves tx", `fn main(): void {
     while (true) {
@@ -60,16 +60,16 @@ fn main(): void {
             }
         });
     }
-}`, "test.tl:5:17: unsupported input: break leaves a transaction body"},
+}`, "test.tl:6:17: unsupported input: break leaves a transaction body"},
 
 		{"db.transaction(5)", `fn main(): void {
     db.transaction(5);
-}`, "test.tl:2:5: unsupported input: db.transaction needs an arrow function argument"},
+}`, "test.tl:3:5: unsupported input: db.transaction needs an arrow function argument"},
 
 		{"db.transaction()", `fn main(): void {
     let n: int64 = 1;
     db.transaction();
-}`, "test.tl:3:5: unsupported input: db.transaction needs an arrow function argument"},
+}`, "test.tl:4:5: unsupported input: db.transaction needs an arrow function argument"},
 
 		{"xs.len = 5", `fn main(): void {
     let xs: int64[] = [1, 2];
@@ -142,12 +142,16 @@ fn main(): void {
         db.transaction((tx) => {
             break;
         });
-    }
-}`, "test.tl:1:16: unsupported input: duplicate parameter name a"},
+}
+}`, "test.tl:2:16: unsupported input: duplicate parameter name a"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			prog, info := checkSrc(t, c.src)
+			src := c.src
+			if strings.Contains(src, "db.") {
+				src = "import { db } from \"tlang/db\";\n" + src
+			}
+			prog, info := checkSrc(t, src)
 			if got := emitErr(t, prog, info); got != c.want {
 				t.Fatalf("Emit error:\n got %s\nwant %s", got, c.want)
 			}
@@ -372,7 +376,11 @@ fn main(): void {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			prog, info := checkSrc(t, c.src)
+			src := c.src
+			if strings.Contains(src, "db.") {
+				src = "import { db } from \"tlang/db\";\n" + src
+			}
+			prog, info := checkSrc(t, src)
 			emitPastPass1(t, prog, info)
 		})
 	}

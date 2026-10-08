@@ -1,3 +1,6 @@
+import { console } from "tlang/system";
+
+
 // F7 gap filler: script entry with globals, loops, console and a may-fail main.
 interface Counter {
     hits: int64;
@@ -16,10 +19,10 @@ fn bump(n: int64): int64 {
 fn main(): void {
     let i: int64 = 0;
     while (i < limit) {
-        console.log("hit", bump(i), counter.names.len);
+        console.info("hit", bump(i), counter.names.len);
         i++;
     }
     for (const name of counter.names) {
-        console.log(name);
+        console.info(name);
     }
 }

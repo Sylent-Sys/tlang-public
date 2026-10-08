@@ -1,3 +1,6 @@
+import { db } from "tlang/db";
+
+
 // Test-only DB-backed e2e fixture (tests-suites design §3.1). A single
 // route_dispatcher program that USES db (uses_db true), so — like the §13
 // server — it cannot start without a database and only runs on the DB legs.

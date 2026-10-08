@@ -375,12 +375,12 @@ func (c *checker) checkTryCatch(sc *scope, s *ast.TryCatchStatement, facts factS
 func (c *checker) checkTransaction(sc *scope, s *ast.TransactionStatement, facts factSet) {
 	if id, ok := s.Receiver.(*ast.Identifier); ok {
 		if b, ok := sc.lookup(id.Name).(*types.Builtin); !ok || b.ID != types.BuiltinDB {
-			c.errorf(s.Receiver.Pos(), "E-TYPE", "transaction receiver must be db")
+			c.errorf(s.Receiver.Pos(), "E-TYPE", "transaction receiver must resolve to the db namespace")
 		} else {
 			c.info.Uses[id] = b
 		}
 	} else {
-		c.errorf(s.Receiver.Pos(), "E-TYPE", "transaction receiver must be db")
+		c.errorf(s.Receiver.Pos(), "E-TYPE", "transaction receiver must resolve to the db namespace")
 	}
 	if s.ParamType != nil {
 		if pt := c.resolveTypeIn(sc, s.ParamType); !types.IsBasic(pt, types.Transaction) && !types.IsInvalid(pt) {

@@ -21,7 +21,7 @@ bool tl_f_allow(tlang_fiber* __fib, tlang_ctx* l_ctx) {
 }
 
 void tl_f_metric(tlang_fiber* __fib, tlang_ctx* l_ctx) {
-    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR(TLANG_STR("done")) }, 1);
+    tlang_console_info(__fib, (tlang_value[1]){ TLANG_VAL_STR(TLANG_STR("done")) }, 1);
 }
 
 void tl_f_audit(tlang_fiber* __fib, tlang_ctx* l_ctx) {

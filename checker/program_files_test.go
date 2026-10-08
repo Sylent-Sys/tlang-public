@@ -170,10 +170,10 @@ func TestCheckProgramDiagnosticFiles(t *testing.T) {
 			name: "transaction rule in a later dependency",
 			files: map[string]string{
 				"a.ts":    "export fn ping(): void {}\n",
-				"b.ts":    "export fn work(): void {\n    db.transaction((tx: Transaction) => {\n        return;\n    });\n}\n",
+				"b.ts":    "import { db } from \"tlang/db\";\nexport fn work(): void {\n    db.transaction((tx: Transaction) => {\n        return;\n    });\n}\n",
 				"main.ts": "import { ping } from \"./a\";\nimport { work } from \"./b\";\nfn main(): void { ping(); work(); }\n",
 			},
-			want: []string{"b.ts:3:9: error E-TX"},
+			want: []string{"b.ts:4:9: error E-TX"},
 		},
 		{
 			// A generic interface declared in a.ts and first instantiated in

@@ -1,3 +1,6 @@
+import { db } from "tlang/db";
+
+
 // codegen-mandatory: 15.2.3 (row descriptors __tl_td_<m> + __tl_fd_<m>)
 interface User {
     id: int64;

@@ -198,13 +198,24 @@ func (c *checker) collectModules() {
 // specTarget returns the moduleCtx a module imports via the given specifier,
 // or nil when the specifier did not resolve (an E-IMPORT was already emitted
 // by module.Build).
-func (c *checker) specTarget(mc *moduleCtx, spec string) *moduleCtx {
+type importTarget struct {
+	source   *moduleCtx
+	standard *module.StandardModule
+}
+
+func (c *checker) specTarget(mc *moduleCtx, spec string) importTarget {
 	for _, e := range mc.mod.Imports {
-		if e.Spec == spec && e.Target != nil {
-			return c.ctxOf(e.Target)
+		if e.Spec != spec {
+			continue
+		}
+		switch e.Target.Kind {
+		case module.ImportTargetSource:
+			return importTarget{source: c.ctxOf(e.Target.Source)}
+		case module.ImportTargetStandard:
+			return importTarget{standard: e.Target.Standard}
 		}
 	}
-	return nil
+	return importTarget{}
 }
 
 // ctxOf returns the moduleCtx of a resolved module, or nil.
@@ -283,7 +294,7 @@ func (c *checker) resolveReExports(mc *moduleCtx) {
 			if spec.Alias != nil {
 				exportAs = spec.Alias.Name
 			}
-			if target == nil {
+			if target.source == nil && target.standard == nil {
 				continue // unresolved specifier already reported by module.Build
 			}
 			visited := map[*moduleCtx]bool{}
@@ -298,30 +309,41 @@ func (c *checker) resolveReExports(mc *moduleCtx) {
 // followExport resolves an exported name in target, following re-export
 // chains. visited guards against a re-export cycle (E-IMPORT). A name that is
 // not exported anywhere on the chain is E-IMPORT at pos.
-func (c *checker) followExport(target *moduleCtx, name string, pos token.Position, visited map[*moduleCtx]bool) types.Object {
-	if visited[target] {
+func (c *checker) followExport(target importTarget, name string, pos token.Position, visited map[*moduleCtx]bool) types.Object {
+	if target.standard != nil {
+		if obj := standardExportObject(target.standard, name); obj != nil {
+			return obj
+		}
+		c.errorf(pos, "E-IMPORT", "%s is not exported", name)
+		return nil
+	}
+	if target.source == nil {
+		return nil
+	}
+	source := target.source
+	if visited[source] {
 		c.errorf(pos, "E-IMPORT", "re-export cycle for %s", name)
 		return nil
 	}
-	visited[target] = true
+	visited[source] = true
 
 	// A direct export of the target binds immediately.
-	if obj := c.directExportObject(target, name); obj != nil {
+	if obj := c.directExportObject(source, name); obj != nil {
 		return obj
 	}
 	// Otherwise it may be a re-export the target itself declares; follow it.
-	for _, stmt := range target.mod.Prog.Statements {
+	for _, stmt := range source.mod.Prog.Statements {
 		re, ok := stmt.(*ast.ReExportDecl)
 		if !ok {
 			continue
 		}
-		next := c.specTarget(target, re.From)
+		next := c.specTarget(source, re.From)
 		for _, spec := range re.Specs {
 			exportAs := spec.Name.Name
 			if spec.Alias != nil {
 				exportAs = spec.Alias.Name
 			}
-			if exportAs != name || next == nil {
+			if exportAs != name || (next.source == nil && next.standard == nil) {
 				continue
 			}
 			return c.followExport(next, spec.Name.Name, pos, visited)
@@ -352,6 +374,10 @@ func (c *checker) declareImports(mc *moduleCtx) {
 			continue
 		}
 		target := c.specTarget(mc, imp.From)
+		if target.standard != nil && !target.standard.Available {
+			c.errorf(imp.FromPos, "E-IMPORT", "standard module %q is not available", imp.From)
+			continue
+		}
 		switch {
 		case imp.Namespace != nil:
 			c.bindNamespaceImport(mc, imp, target)
@@ -364,12 +390,14 @@ func (c *checker) declareImports(mc *moduleCtx) {
 
 // bindNamespaceImport binds "import * as m from ..." as a *types.ModuleNS
 // carrying the target module's export set and default.
-func (c *checker) bindNamespaceImport(mc *moduleCtx, imp *ast.ImportDecl, target *moduleCtx) {
+func (c *checker) bindNamespaceImport(mc *moduleCtx, imp *ast.ImportDecl, target importTarget) {
 	exports := map[string]types.Object{}
 	var def types.Object
-	if target != nil {
-		exports = target.exports
-		def = target.defaultExport
+	if target.source != nil {
+		exports = target.source.exports
+		def = target.source.defaultExport
+	} else if target.standard != nil {
+		exports = standardExports(target.standard)
 	}
 	ns := &types.ModuleNS{
 		Name:    imp.Namespace.Name,
@@ -382,33 +410,38 @@ func (c *checker) bindNamespaceImport(mc *moduleCtx, imp *ast.ImportDecl, target
 
 // bindDefaultImport binds "import D from ..." to the target's default export
 // (DESIGN-modules.md §6.4). A target with no default export is E-IMPORT.
-func (c *checker) bindDefaultImport(mc *moduleCtx, imp *ast.ImportDecl, target *moduleCtx) {
+func (c *checker) bindDefaultImport(mc *moduleCtx, imp *ast.ImportDecl, target importTarget) {
 	if imp.Default == nil {
 		return
 	}
-	if target == nil {
+	if target.source == nil && target.standard == nil {
 		return
 	}
-	if target.defaultExport == nil {
+	if target.source == nil || target.source.defaultExport == nil {
 		c.errorf(imp.Default.NamePos, "E-IMPORT", "module %q has no default export", imp.From)
 		return
 	}
-	c.bindImportName(mc, imp.Default.Name, target.defaultExport, imp.Default.NamePos)
+	c.bindImportName(mc, imp.Default.Name, target.source.defaultExport, imp.Default.NamePos)
 }
 
 // bindNamedImports binds each "{ A, B as C }" specifier to the target's
 // matching export, with the FR-16 (not exported) vs FR-17 (no such member)
 // distinction.
-func (c *checker) bindNamedImports(mc *moduleCtx, imp *ast.ImportDecl, target *moduleCtx) {
+func (c *checker) bindNamedImports(mc *moduleCtx, imp *ast.ImportDecl, target importTarget) {
 	for _, spec := range imp.Named {
 		local := spec.Name.Name
 		if spec.Alias != nil {
 			local = spec.Alias.Name
 		}
-		if target == nil {
+		if target.source == nil && target.standard == nil {
 			continue
 		}
-		obj := target.exports[spec.Name.Name]
+		var obj types.Object
+		if target.source != nil {
+			obj = target.source.exports[spec.Name.Name]
+		} else {
+			obj = standardExportObject(target.standard, spec.Name.Name)
+		}
 		if obj == nil {
 			c.reportMissingImport(target, spec.Name.Name, spec.Name.NamePos, imp.From)
 			continue
@@ -421,12 +454,40 @@ func (c *checker) bindNamedImports(mc *moduleCtx, imp *ast.ImportDecl, target *m
 // import that did not resolve: a name the target declares but does not export
 // is "not exported by" (FR-16); a name it has no declaration for is "no
 // exported member" (FR-17).
-func (c *checker) reportMissingImport(target *moduleCtx, name string, pos token.Position, spec string) {
-	if c.targetDeclares(target, name) {
+func (c *checker) reportMissingImport(target importTarget, name string, pos token.Position, spec string) {
+	if target.source != nil && c.targetDeclares(target.source, name) {
 		c.errorf(pos, "E-IMPORT", "%s is not exported by %s", name, spec)
 	} else {
 		c.errorf(pos, "E-IMPORT", "no exported member %s in %s", name, spec)
 	}
+}
+
+func standardExports(m *module.StandardModule) map[string]types.Object {
+	exports := make(map[string]types.Object, len(m.Exports))
+	for _, export := range m.Exports {
+		if obj := standardExportObject(m, export.Name); obj != nil {
+			exports[export.Name] = obj
+		}
+	}
+	return exports
+}
+
+func standardExportObject(m *module.StandardModule, name string) types.Object {
+	if m == nil {
+		return nil
+	}
+	for _, export := range m.Exports {
+		if export.Name != name {
+			continue
+		}
+		switch export.ID {
+		case module.StandardExportDB:
+			return types.StandardExportObject(types.StandardExportDatabase)
+		case module.StandardExportConsole:
+			return types.StandardExportObject(types.StandardExportSystemConsole)
+		}
+	}
+	return nil
 }
 
 // targetDeclares reports whether target declares a top-level name at all

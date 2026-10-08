@@ -20,21 +20,21 @@ int64_t tl_f_div(tlang_fiber* __fib, int64_t l_a, int64_t l_b) {
 }
 
 void tl_f_logs(tlang_fiber* __fib, int64_t l_n, tlang_string l_s, tlang_opt_i64 l_o, int32_t l_i, double l_f, bool l_b) {
-    tlang_console_log(__fib, NULL, 0);
-    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR(TLANG_STR("one")) }, 1);
-    tlang_console_log(__fib, (tlang_value[8]){ TLANG_VAL_STR(l_s), TLANG_VAL_I64(l_n), TLANG_VAL_I32(l_i), TLANG_VAL_F64(l_f), TLANG_VAL_BOOL(l_b), TLANG_VAL_I64(7), TLANG_VAL_F64(2.5), TLANG_VAL_BOOL(true) }, 8);
+    tlang_console_info(__fib, NULL, 0);
+    tlang_console_info(__fib, (tlang_value[1]){ TLANG_VAL_STR(TLANG_STR("one")) }, 1);
+    tlang_console_info(__fib, (tlang_value[8]){ TLANG_VAL_STR(l_s), TLANG_VAL_I64(l_n), TLANG_VAL_I32(l_i), TLANG_VAL_F64(l_f), TLANG_VAL_BOOL(l_b), TLANG_VAL_I64(7), TLANG_VAL_F64(2.5), TLANG_VAL_BOOL(true) }, 8);
     int64_t __t1 = tl_f_div(__fib, l_n, 2);
     if (__fib->err) goto __fail;
     int64_t __t2 = tl_f_div(__fib, l_n, l_n);
     if (__fib->err) goto __fail;
-    tlang_console_log(__fib, (tlang_value[3]){ TLANG_VAL_I64(__t1), TLANG_VAL_STR(tlang_str_concat(__fib, l_s, TLANG_STR("!"))), TLANG_VAL_I64(__t2) }, 3);
+    tlang_console_info(__fib, (tlang_value[3]){ TLANG_VAL_I64(__t1), TLANG_VAL_STR(tlang_str_concat(__fib, l_s, TLANG_STR("!"))), TLANG_VAL_I64(__t2) }, 3);
     tlang_console_error(__fib, (tlang_value[2]){ TLANG_VAL_STR(TLANG_STR("err")), TLANG_VAL_I64(l_n) }, 2);
     tlang_console_error(__fib, NULL, 0);
     if (l_o.has) {
-        tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_I64(l_o.v) }, 1);
+        tlang_console_info(__fib, (tlang_value[1]){ TLANG_VAL_I64(l_o.v) }, 1);
     }
-    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_I64(l_o.has ? l_o.v : 0) }, 1);
-    tlang_console_log(__fib, (tlang_value[1]){ TLANG_VAL_STR((l_i > 0) ? TLANG_STR("pos") : TLANG_STR("neg")) }, 1);
+    tlang_console_info(__fib, (tlang_value[1]){ TLANG_VAL_I64(l_o.has ? l_o.v : 0) }, 1);
+    tlang_console_info(__fib, (tlang_value[1]){ TLANG_VAL_STR((l_i > 0) ? TLANG_STR("pos") : TLANG_STR("neg")) }, 1);
     return;
     __fail: ;
     return;

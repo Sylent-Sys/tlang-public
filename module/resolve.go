@@ -12,6 +12,7 @@ const codeImport = "E-IMPORT"
 
 // resolution is the successful result of resolving one specifier.
 type resolution struct {
+	standard *StandardModule
 	// id is the module identity: a normalized repo-relative slash path with
 	// extension (DESIGN-modules.md §3.2). The root module has id "" turned
 	// into the empty-dir identity by the caller.
@@ -48,6 +49,19 @@ func (e *resolveErr) Error() string { return e.message }
 // and candidates are probed through fsys. No diagnostic ever echoes a path
 // outside the root.
 func resolve(fsys FileSystem, rootDir, dirID, spec string) (resolution, *resolveErr) {
+	if spec == "tlang" || hasPrefix(spec, "tlang/") {
+		if spec == "tlang" || !validStandardSpecifier(spec) {
+			return resolution{}, &resolveErr{message: "invalid standard module specifier " + quote(spec)}
+		}
+		m, ok := LookupStandardModule(spec)
+		if !ok {
+			return resolution{}, &resolveErr{message: "unknown standard module " + quote(spec)}
+		}
+		if !m.Available {
+			return resolution{}, &resolveErr{message: "standard module " + quote(spec) + " is not available"}
+		}
+		return resolution{standard: m}, nil
+	}
 	if !hasRelPrefix(spec) {
 		if path.IsAbs(spec) || filepath.IsAbs(spec) {
 			return resolution{}, &resolveErr{message: "absolute import specifier " + quote(spec) + " is not allowed; use a relative path (\"./\" or \"../\")"}
@@ -88,6 +102,24 @@ func resolve(fsys FileSystem, rootDir, dirID, spec string) (resolution, *resolve
 	default:
 		return resolution{}, &resolveErr{message: "ambiguous import " + quote(spec) + "; both " + candidateList(candidates) + " exist"}
 	}
+}
+
+func validStandardSpecifier(spec string) bool {
+	if !hasPrefix(spec, "tlang/") || len(spec) == len("tlang/") {
+		return false
+	}
+	segmentStart := len("tlang/")
+	for i := segmentStart; i <= len(spec); i++ {
+		if i != len(spec) && spec[i] != '/' {
+			continue
+		}
+		segment := spec[segmentStart:i]
+		if segment == "" || segment == "." || segment == ".." {
+			return false
+		}
+		segmentStart = i + 1
+	}
+	return true
 }
 
 // hasRelPrefix reports whether spec begins "./" or "../" (slash form; the

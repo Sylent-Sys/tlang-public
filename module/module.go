@@ -42,9 +42,34 @@ type Edge struct {
 	Spec string
 	// Pos is the position of the specifier string literal.
 	Pos token.Position
-	// Target is the resolved module, or nil when the specifier failed to
-	// resolve (a diagnostic was emitted on Graph.Diags).
-	Target *Module
+	// Target is the resolved source or standard module. Its zero value means
+	// resolution failed and a diagnostic was emitted on Graph.Diags.
+	Target ImportTarget
+}
+
+// ImportTargetKind discriminates source and compiler-provided targets.
+type ImportTargetKind uint8
+
+const (
+	ImportTargetInvalid ImportTargetKind = iota
+	ImportTargetSource
+	ImportTargetStandard
+)
+
+// ImportTarget is a resolved edge target. Exactly one payload is meaningful
+// according to Kind.
+type ImportTarget struct {
+	Kind     ImportTargetKind
+	Source   *Module
+	Standard *StandardModule
+}
+
+func SourceImportTarget(m *Module) ImportTarget {
+	return ImportTarget{Kind: ImportTargetSource, Source: m}
+}
+
+func StandardImportTarget(m *StandardModule) ImportTarget {
+	return ImportTarget{Kind: ImportTargetStandard, Standard: m}
 }
 
 // Graph is the built module graph.

@@ -51,7 +51,7 @@ func (c *checker) callOrdinaryBuiltin(sc *scope, e *ast.CallExpression, m *ast.M
 // callSpecialBuiltin dispatches the special-cased builtins.
 func (c *checker) callSpecialBuiltin(sc *scope, e *ast.CallExpression, m *ast.MemberExpression, sel *types.Selection, facts factSet) types.TypeAndValue {
 	switch sel.Builtin {
-	case types.BuiltinConsoleLog, types.BuiltinConsoleError:
+	case types.BuiltinConsoleLog, types.BuiltinConsoleInfo, types.BuiltinConsoleError:
 		return c.callConsole(sc, e, m, sel, facts)
 	case types.BuiltinArrayPush:
 		return c.callPush(sc, e, m, sel, facts)
@@ -320,7 +320,7 @@ func (c *checker) checkSQLArgs(sc *scope, e *ast.CallExpression, id types.Builti
 func (c *checker) recordBuiltinCall(e *ast.CallExpression, m *ast.MemberExpression, id types.BuiltinID, route *types.Route) {
 	call := &types.Call{Kind: types.CallBuiltin, Builtin: id, Route: route}
 	// A namespace member (console.*, db.*) has no value receiver.
-	if _, ok := m.Object.(*ast.Identifier); !ok || !c.isNamespaceObject(m.Object) {
+	if !c.isNamespaceObject(m.Object) {
 		call.Recv = m.Object
 	}
 	c.info.Calls[e] = call
@@ -329,10 +329,13 @@ func (c *checker) recordBuiltinCall(e *ast.CallExpression, m *ast.MemberExpressi
 // isNamespaceObject reports whether o is the console or db namespace
 // identifier.
 func (c *checker) isNamespaceObject(o ast.Expression) bool {
-	id, ok := o.(*ast.Identifier)
-	if !ok {
-		return false
+	switch o := o.(type) {
+	case *ast.Identifier:
+		_, ok := c.info.Uses[o].(*types.Builtin)
+		return ok
+	case *ast.MemberExpression:
+		sel := c.info.Selections[o]
+		return sel != nil && sel.Kind == types.SelNamespace
 	}
-	_, ok = c.info.Uses[id].(*types.Builtin)
-	return ok
+	return false
 }

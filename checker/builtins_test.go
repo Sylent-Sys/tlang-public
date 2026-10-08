@@ -75,12 +75,12 @@ func TestSelectBuiltinOnDefaultedConstant(t *testing.T) {
 }
 
 func TestSelectNamespace(t *testing.T) {
-	src := wrap(`console.log("hi");`)
+	src := wrap(`console.info("hi");`)
 	prog, info, diags := checkProg(t, src)
 	wantCodes(t, diags)
-	sel := selByString(prog, info, "console.log")
-	if sel == nil || sel.Kind != types.SelBuiltin || sel.Builtin != types.BuiltinConsoleLog {
-		t.Fatalf("console.log selection = %+v, want SelBuiltin log", sel)
+	sel := selByString(prog, info, "console.info")
+	if sel == nil || sel.Kind != types.SelBuiltin || sel.Builtin != types.BuiltinConsoleInfo {
+		t.Fatalf("console.info selection = %+v, want SelBuiltin info", sel)
 	}
 }
 
@@ -96,7 +96,7 @@ func TestOptionalReceiverError(t *testing.T) {
 }
 
 func TestConsoleVariadic(t *testing.T) {
-	src := wrap(`console.log("a", 1, true, 2.5);`)
+	src := wrap(`console.info("a", 1, true, 2.5);`)
 	_, diags := check(t, src)
 	wantCodes(t, diags)
 }
@@ -104,7 +104,7 @@ func TestConsoleVariadic(t *testing.T) {
 func TestConsoleRejectsInterface(t *testing.T) {
 	src := `
 interface User { id: int64; }
-fn f(u: User): void { console.log(u); }
+fn f(u: User): void { console.info(u); }
 `
 	_, diags := check(t, src)
 	if !hasCode(diags, "E-TYPE") {
