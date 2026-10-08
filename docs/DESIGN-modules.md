@@ -1,11 +1,14 @@
-# TLang Modules — Design Proposal (v1+)
+# TLang Modules — Implemented Design and Standard-Module Draft
 
-**Status: IMPLEMENTED.** This was the RFC; it is now
-the design of record. The open questions were signed off as: Option A (one C
-translation unit), ES-style syntax, and the full sugar set (aliased imports,
-re-exports, namespace imports, default exports). §0 describes TLang *before*
-modules and is kept for context. Where the shipped code differs from this text,
-the code wins.
+> **Status**
+>
+> - Local-file modules (§§1–11): implemented design of record.
+> - Compilation model: one generated C translation unit.
+> - Standard modules (§12): draft; not implemented.
+> - §0 records the historical pre-module baseline.
+>
+> Any divergence between §§1–11 and shipped behavior is a documentation or
+> implementation defect and should be resolved explicitly.
 
 *Original status:* PROPOSAL / RFC. This document records the design for adding a
 module system (`import` / `export`) to TLang so a program can span many files
@@ -23,7 +26,7 @@ Section references like §5.3 point into the spec
 
 ## 0. Motivation and the current state
 
-### 0.1 Where TLang is today
+### 0.1 Historical baseline before modules
 
 TLang v1 is **single-file**. There is no `import`, `export`, `module`,
 `package`, or `namespace` — not in the spec, the lexer, the token set, or the
@@ -66,9 +69,10 @@ That is fine for the spec's §13 example and does not scale.
   or incremental/partial rebuilds. (Discussed in §6 as a possible later step.)
 - A package registry, versioning, or remote/third-party imports. v1+ modules are
   **local files in the project tree only**.
-- Re-exports, aliased imports (`import { X as Y }`), wildcard/`import *`, circular
-  *value* initialization semantics beyond what §4.4 defines. These are listed as
-  future extensions in §9.
+- Export-star re-exports, side-effect-only imports, anonymous default exports,
+  and circular *value* initialization semantics beyond what §4.4 defines.
+  Named aliases, namespace imports, default imports, named/default declaration
+  exports, and named re-exports are implemented.
 - Visibility finer than file-level (no package-private tiers, no submodule trees).
 
 ---
@@ -183,6 +187,8 @@ wherever `User` is in scope). Decorated functions may be exported:
 ```ts
 // api/routes.ts
 import { User, displayName } from "./models/user";
+import DefaultThing, { helper as localHelper } from "./other";
+import * as strings from "../util/strings";
 import { greet } from "../util/strings";
 
 fn route_dispatcher(ctx: Context): void { ... }   // uses User, displayName
@@ -193,7 +199,10 @@ fn route_dispatcher(ctx: Context): void { ... }   // uses User, displayName
   resolution order defined in §3.2). Absolute paths and bare specifiers
   (`"user"`, `"@scope/pkg"`) are **rejected** in v1+ (reserved for a future
   package system, §9).
-- The import list names specific exported symbols. Each imported name is bound
+- Named imports name specific exported symbols and may use `as` aliases. A
+  default import binds the target's default export and may combine with a named
+  list. A namespace import binds the target module object and does not combine
+  with default/named imports. Each imported name is bound
   in the importing file's namespace and must resolve to an `export`ed
   declaration in the target file (else `E-IMPORT`).
 - Importing a name that exists but is not exported is `E-IMPORT` ("X is not
@@ -205,16 +214,20 @@ New tokens: `IMPORT`, `EXPORT`, `FROM` (keywords). `import`/`export`/`from`
 join the keyword table. (The string specifier reuses the existing string-literal
 token; `{` `}` `,` already exist.)
 
-Grammar (extending DESIGN §2.2):
+Implemented grammar (extending DESIGN §2.2):
 
 ```
-program    := importDecl* topDecl*
-importDecl := 'import' '{' importName (',' importName)* ','? '}' 'from' STRING ';'
-importName := IDENT
-topDecl    := 'export'? decorator* fnDecl
-            | 'export'? interfaceDecl
-            | 'export'? typeDecl
-            | 'export'? letDecl | 'export'? constDecl
+program    := (importDecl | reExportDecl)* topDecl*
+importDecl := 'import' (IDENT (',' namedImports)? | namedImports | '*' 'as' IDENT)
+              'from' STRING ';'
+namedImports := '{' importName (',' importName)* ','? '}'
+importName := IDENT ('as' IDENT)?
+reExportDecl := 'export' namedImports 'from' STRING ';'
+topDecl    := ('export' 'default'?)? decorator* fnDecl
+            | ('export' 'default'?)? interfaceDecl
+            | ('export' 'default'?)? typeDecl
+            | ('export' 'default'?)? letDecl
+            | ('export' 'default'?)? constDecl
 ```
 
 Rules the parser enforces locally (no cross-file knowledge needed): all
@@ -222,6 +235,9 @@ Rules the parser enforces locally (no cross-file knowledge needed): all
 interleaving, but requiring imports first keeps the grammar and reader simple;
 this can be relaxed later with no breaking change). A duplicate imported name in
 one file, or an empty `{}`, is a parse-level `E-IMPORT`/`E-PARSE`.
+
+The implemented syntax does not include side-effect-only imports, export-star
+re-exports, or anonymous default exports.
 
 ### 2.4 The entry rule across modules
 
@@ -241,7 +257,7 @@ entry-conflict error, now computed over the merged program.
 
 ### 3.1 What is a module
 
-**One file = one module.** Its identity is its normalized, repo-relative path
+**One file = one module.** Its identity is its normalized, project-root-relative path
 (e.g. `models/user.ts`). There is no `package` clause and no directory grouping
 in v1+ (that is a Go-style alternative considered and rejected in §8).
 
@@ -250,15 +266,19 @@ in v1+ (that is a Go-style alternative considered and rejected in §8).
 Given an importing file at `dir/` and a specifier `"./models/user"`:
 
 1. Resolve the specifier relative to `dir`, producing a candidate path.
-2. If it has an extension, use it. Otherwise try `<path>.ts` then `<path>.tlang`
+2. An explicit `.ts` or `.tlang` extension is used as written. A different
+   explicit extension is rejected. Without an extension, try `<path>.ts` then `<path>.tlang`
    (the two accepted source extensions, DESIGN §1); if both exist it is an
    `E-IMPORT` ambiguity error (deterministic, not a silent pick).
-3. Normalize to a repo-relative, slash-separated path for the module identity so
+3. Normalize to a project-root-relative, slash-separated path for the module identity so
    two specifiers that reach the same file (`./a` from one dir, `../x/a` from
    another) are the **same module**, loaded once.
-4. The resolved path must stay **within the project root** (the directory of the
-   root module, or a configured source root). Escaping it (`../../etc/...`) is an
-   `E-IMPORT` error. No absolute paths, no symlink traversal outside the root.
+4. The resolved path must stay lexically **within the project root** (the
+   directory of the root module, or a configured source root). Escaping it
+   (`../../etc/...`) is an `E-IMPORT` error. Absolute paths are rejected. The
+   current resolver follows filesystem symlinks and is not a sandbox against a
+   symlink inside the source tree that targets outside the root; builds must not
+   treat an untrusted project tree as a security boundary.
 5. A missing file is `E-IMPORT` with the specifier and the resolved path (never
    echoing anything outside the project).
 
@@ -274,9 +294,10 @@ The front-end builds a module graph by transitive closure from the root module:
   as they are within one file today). A cycle is only a problem for **global
   initializer ordering** — see §4.4. Pure type/function cycles get no error.
 - Processing order for determinism: the graph is walked in a **fixed,
-  path-sorted order** so the merged declaration list and thus the emitted C are
-  byte-identical regardless of filesystem iteration order (the determinism suite
-  demands this).
+  dependency-first order** with normalized module identity as the tie-break.
+  When an import cycle remains, its members are emitted in deterministic module
+  identity order. Thus the order is total and byte-identical regardless of
+  filesystem iteration order.
 
 ---
 
@@ -337,20 +358,28 @@ compatibility). This falls out of symbol identity being module-qualified.
 
 ### 4.4 Global initialization order (the one real semantic subtlety)
 
-Top-level `let`/`const` run their initializers once per scheduler at startup, in
-**declaration order** today (DESIGN §2.10). Across modules this needs a defined
-order. Proposal:
+Top-level `let`/`const` run their initializers once per scheduler at startup.
+Across modules their baseline order is the graph's deterministic dependency-first
+order (§3.3), source order within each module. For import cycles, module identity
+breaks the cycle deterministically; a cyclic import graph therefore still has a
+total initialization order.
 
-- Global initializers run in **dependency order**: a module's globals initialize
-  after the globals of every module it imports (topological order of the import
-  graph), and within a module in source order.
+- The checker separately builds a dependency graph from **direct global reads**
+  appearing in initializer expressions and rejects every cycle as `E-INIT`.
+  Called function bodies are not traversed by the current analysis, although a
+  function invoked by an initializer executes immediately. Consequently an
+  indirect read/cycle through a called function is not statically diagnosed and
+  observes the established initialization order. This is a documented analysis
+  limitation, not a claim that the function runs later; production hardening
+  should either add interprocedural initializer dependencies or reject calls
+  whose global-read effects cannot be proven safe.
 - A **cycle in global-initializer dependencies** (module A's global reads module
   B's global and vice versa, where the import graph is cyclic *through globals*)
   is an `E-INIT` error — the same spirit as the existing non-optional-field-cycle
   rejection. Pure type/function import cycles are fine (§3.3); only a cyclic
   *global-value* dependency is rejected.
-- The generated `tl__init_globals` becomes a sequence of per-module init blocks
-  emitted in that topological order (still one function, still per-scheduler).
+- The generated `tl__init_globals` is a sequence of per-module init blocks in
+  that total order (still one function, still per-scheduler).
 
 ### 4.5 Diagnostics
 
@@ -371,10 +400,14 @@ guarantee uniqueness within one file. With two modules each declaring `User`,
 both want `tl_User` — a collision. The mangling scheme must gain a **module
 qualifier**:
 
-- Give every module a stable, collision-free **module tag** derived
-  deterministically from its normalized path (e.g. a sanitized path plus a short
-  content-independent disambiguator; the exact scheme is an implementation
-  detail, but it must be injective and path-order-independent).
+- Give every module a stable **module tag** derived deterministically from its
+  normalized path. The current implementation uses a sanitized path plus a
+  32-bit FNV-1a suffix; this is deterministic and compact, not mathematically
+  injective. The current implementation does not yet verify hash collisions;
+  this is a conformance gap. Before code generation, the frontend must detect
+  duplicate module tags or generated C names across the complete graph and
+  reject them deterministically. Code generation must never silently emit
+  colliding names.
 - Qualify user-declared C names with the module tag: `tl_<mod>__User`,
   `tl_f_<mod>__greet`, `tl_m_<mod>__User__displayName`. The existing
   `tl_`/`tl_f_`/`tl_m_` family and the reserved `globals`/`_init_globals` shapes
@@ -383,7 +416,8 @@ qualifier**:
 - **`CheckDeclName` / collision checking (historical PR #8) extends, not changes:** within a
   module the same reservations apply; across modules the module tag keeps names
   injective by construction, so the cross-declaration collision pass now runs
-  per module and the global uniqueness is structural. This is an *implementation*
+  per module; graph-wide collision verification establishes global uniqueness.
+  This is an *implementation*
   change to the (currently locked) mangling in `types/`, done as a deliberate,
   reviewed opening of that package — exactly as the pg.c and checker fixes were.
 - **Monomorphized generics** (`Page<User>`): a generic instantiated in multiple
@@ -428,7 +462,7 @@ reason to prefer Option A.
 
 ---
 
-## 7. Testing strategy (when/if implemented)
+## 7. Implemented testing strategy
 
 Mirrors the existing suites (`docs/DESIGN.md` §5, `tests/`):
 
@@ -471,12 +505,14 @@ Mirrors the existing suites (`docs/DESIGN.md` §5, `tests/`):
 
 ## 9. Future extensions (explicitly out of this first cut)
 
-- Aliased / renamed imports (`import { User as U }`), re-exports
-  (`export { X } from "./y"`), and namespace imports (`import * as m`).
+- Export-star re-exports (`export * from "./m"`), side-effect-only imports
+  (`import "./m"`), and anonymous default exports.
 - A package system: bare specifiers (`"strings"`), a project manifest, versioned
   / third-party / remote dependencies, and a resolution algorithm beyond relative
   paths. (The specifier grammar already reserves bare/absolute forms by rejecting
-  them, so adding this later is non-breaking.)
+  them, so adding this later is non-breaking.) Compiler-provided standard modules
+  using a reserved `"tlang/..."` specifier are proposed separately in §12; they
+  are not user packages and do not imply a registry or remote dependency system.
 - Separate compilation (Option B) for incremental builds.
 - Finer visibility tiers (package-private) if directory grouping is ever added.
 - Relaxing "imports must come first" to TypeScript's interleaved form.
@@ -497,11 +533,10 @@ Mirrors the existing suites (`docs/DESIGN.md` §5, `tests/`):
 | `runtime/` | **No change** | None |
 | `tests/` | New multi-file golden/reject/determinism/ccompile/e2e/fuzz coverage | Medium |
 
-This is a **heavy, multi-package feature** that deliberately reopens several
-currently-frozen packages (`parser`, `checker`, `types` mangling, `codegen`). It
-is net-new scope the spec never defined — so it is a *feature design*, not a bug
-fix. Nothing here is implemented; this document exists to be reviewed and
-approved (or redirected) before any code is written.
+This was a **heavy, multi-package feature** that deliberately reopened several
+packages (`parser`, `checker`, `types` mangling, `codegen`). It was net-new scope
+the spec never defined. The local-file module system described above is
+implemented; the standard-library proposal in §12 is not.
 
 ---
 
@@ -516,3 +551,431 @@ cost concentrates in the front end: new grammar, a module-graph builder, a
 multi-module checker entry with per-file scopes, and module-qualified mangling.
 Separate compilation and a package/registry system are deferred, with the
 specifier grammar reserved so they can arrive later without breaking changes.
+
+---
+
+## 12. Compiler-provided standard modules — design direction
+
+**Status: draft, not implemented.** This section records proposed acceptance
+requirements for compiler-provided modules. In this section, **must** denotes a
+requirement for an accepted implementation, **should** denotes a preferred
+choice that requires documented justification to change, and **may** denotes
+permission. Statements about current behavior are explicitly labeled
+"currently". The existing local-file module implementation remains unchanged
+until this draft is accepted and implemented.
+
+### 12.1 Agreed direction
+
+- **Standard modules are explicit.** Capabilities that are currently injected
+  implicitly, initially `db` and `console`, should become available only through
+  imports. There is no migration warning period: during implementation on the
+  development branch, using these names without importing them becomes an
+  error. Existing programs and examples must be migrated before release.
+- **Initial module roots.** The planned roots are `tlang/db`, `tlang/http`, and
+  `tlang/system`. `db` and HTTP APIs remain separate; `system` is the home for
+  console, JSON helpers, environment/configuration, UUID, date/time, and
+  platform APIs. This is an intentionally broad initial scope; exact exports
+  remain to be designed.
+- **Use the implemented import/export forms.** Standard specifiers reuse the
+  existing import declaration and binding syntax: named imports and aliases,
+  default imports (optionally combined with named imports), namespace imports,
+  named re-exports, and named/default declaration exports. This does not enable
+  syntax that local modules do not already support. Direct imports use forms
+  such as `import { db } from "tlang/db"`; §9 remains authoritative for syntax
+  still deferred.
+- **Reserve the `"tlang/..."` namespace.** It identifies compiler-provided
+  standard modules permanently. Third-party packages must not use this prefix;
+  future package specifiers use other names. Standard-module APIs evolve with
+  the TLang language version; breaking standard API changes require a language
+  version change rather than a versioned import path.
+- **Resolve standard specifiers virtually.** Import declarations and bindings
+  reuse existing syntax, but resolution does not use local-file semantics. A
+  case-sensitive specifier beginning exactly `tlang/` is looked up in a
+  compiler-owned virtual-module registry before filesystem resolution. It is
+  never relative to the importing file and never probes disk. `tlang`,
+  `tlang/`, empty/repeated path segments, `.`/`..`, and unknown module names are
+  `E-IMPORT`; other bare specifiers remain rejected until a package resolver is
+  designed. Unknown exports from a known virtual module are separately reported
+  as `E-IMPORT` at the imported name.
+- **Imports are file-scoped.** An import makes its exported names available only
+  in the importing module. Other modules must import the names they use.
+- **Preserve compiler/runtime lowering initially.** Making a namespace
+  importable does not require immediately rewriting its implementation as
+  ordinary TLang library code. Existing checker and codegen special cases can
+  remain behind the imported standard-module export during an initial phase.
+- **Performance is a contract to measure, not a claim of zero-cost abstraction.**
+  Standard APIs should preserve TLang's AOT C generation, monomorphization,
+  request-arena lifetimes, and fiber scheduler. Prefer generated/direct paths
+  where static type information exists; add generic/dynamic APIs where they
+  provide real value, with explicit allocation and streaming behavior. Benchmark
+  throughput, tail latency, allocations, binary size, and compile time against
+  the current lower-level runtime APIs before declaring regressions acceptable.
+- **No `Row` marker.** The proposed `Row` export is dropped. The type argument in
+  `db.query<T>` / `db.queryOne<T>` remains the concrete user-defined interface
+  whose supported scalar fields describe returned columns; no base marker is
+  required.
+
+### 12.2 Database engine linkage and configuration direction
+
+Importing `db` controls whether the `db` name is available in that module. The
+generated program should avoid linking/configuring a database engine unless an
+operation for that engine is reachable from the selected program entry.
+Reachability is determined through the interprocedural call graph; an unused
+`db` import or an operation only in an unreachable function does not enable an
+engine. Re-exports and calls across imported modules participate in the same
+whole-program analysis. If reachable operations use more than one engine, link
+and configure each used engine independently; configuration for one engine must
+not silently substitute for another.
+
+### 12.3 System API contracts
+
+Phase 1 compiler support is limited to the virtual exports `tlang/db` (`db`)
+and `tlang/system` (`console`). Those imports are resolved before filesystem
+resolution and never create source modules or emitted declarations. `db` and
+`console` are no longer implicit universe names. The compiler rejects
+`tlang/http` as unavailable until its declarations ship. The initial console
+surface is `info` and `error`; `info` preserves the existing line-oriented
+stdout runtime behavior, while `console.log` is not source-visible.
+
+Standard APIs are explicit imports, not implicit authority. The project
+manifest defines the program's maximum requested authority. Runtime grants
+must cover every requested static capability or startup fails before user code;
+a grant not requested by the manifest confers no authority. After successful
+validation, effective authority is exactly the manifest request, further
+constrained on each resource operation by the validated resource grant. Grants are scoped by
+resource and grouped into filesystem, process, network, signal, and future
+device families. `tlang/system` owns console, JSON, environment, UUID, time,
+filesystem, process, network, and lifecycle cancellation APIs. Device-specific
+APIs are excluded until their own design; ordinary filesystem APIs reject
+device nodes and other special files.
+
+Unless a subsystem says otherwise, standard operations fail through TLang's
+existing `Error`/throw mechanism. Each API specification must assign stable,
+portable error categories (for example permission, invalid input, not found,
+limit, timeout, cancelled, unavailable, and I/O). Native errno/database/backend
+details are optional diagnostic metadata, not portable control-flow values.
+Retryability must be stated per operation; callers must not infer it from a
+platform error number.
+
+#### 12.3.1 Environment and console
+
+- Environment access is read-only and lookup-only; enumeration and mutation are
+  not provided. A lookup takes an exact variable name. The name must be listed
+  in project metadata and separately granted at runtime. An undeclared or
+  ungranted read returns a permission error, distinct from an unset variable.
+- Console provides structured `debug`, `info`, `warn`, and `error` logging.
+  Records are JSON Lines with UTC RFC 3339 timestamp, level, message, and
+  optional scalar/JSON fields (string, number, boolean, null, or JSON value).
+  Logging is best-effort: sink failures do not fail application operations and
+  are reported through runtime diagnostics/health output. During the breaking
+  import migration, existing `console.log` is replaced by `console.info`; no
+  compatibility alias is implied. The runtime serializes complete JSON-line
+  records so writes from scheduler threads do not interleave. Log calls may
+  allocate in the current arena but do not suspend application fibers.
+
+#### 12.3.2 JSON
+
+- Typed TLang interface binding and emission remain compiler-generated.
+- The typed fast path emits direct field reads/writes and static metadata; it
+  must not introduce runtime reflection, per-field dynamic dispatch, or a
+  mandatory intermediate generic JSON tree. Generic JSON is an opt-in path.
+- Generic JSON uses a tagged value model: null, boolean, float64 number,
+  string, array, and object. Checked integer accessors report range or
+  precision failures; large integers otherwise follow JavaScript Number-style
+  precision semantics. Parse/stringify return typed errors.
+- Parsing applies runtime-configurable default byte and nesting-depth limits,
+  also bounded by hard runtime ceilings. Malformed and over-limit input returns
+  a typed error and never aborts the process.
+- Parsing/stringifying should support stream-oriented operation where the input
+  or output can exceed practical request-arena limits. Convenience whole-value
+  APIs are bounded; request-scoped results live in the request arena, and data
+  retained beyond that lifetime requires an explicit clone/ownership transition.
+
+#### 12.3.3 Time and date
+
+JavaScript's existing `Date` and ECMAScript date-time string behavior is the
+primary compatibility reference. Temporal is not assumed. Java or C# may be
+used only for a specific capability absent from JavaScript or where JavaScript
+behavior is unsuitable; the selected precedent and reason must be documented.
+Compatibility does not require reproducing legacy bugs, implementation-defined
+parsing, or unsafe implicit behavior. The language specification must identify
+every intentional difference. This is a compatibility policy, not a claim that
+TLang's complete temporal API is equivalent to JavaScript `Date`.
+
+The first-release value model is `Instant`, fixed `Duration`, calendar `Period`,
+`LocalDate`, `LocalDateTime`, explicit IANA `Zone`, `ZonedDateTime`, and a
+distinct process-local `MonotonicInstant`. `Duration` is fixed elapsed
+nanoseconds; `Period` is signed calendar components applied in an explicit zone,
+and the two are not implicitly convertible. `Instant` uses the Unix epoch and ignores leap
+seconds as JavaScript `Date` does, but supports nanosecond precision as an
+explicit extension beyond `Date`'s millisecond precision. Civil fields use the
+proleptic Gregorian calendar. TLang's supported `Instant` and civil range is
+years 0001–9999; values outside it return range errors even though JavaScript
+Date supports a much wider range. Wall/monotonic clock APIs use nanosecond
+units; actual clock resolution is platform-dependent. Clock-read failure is a
+typed error. There is no implicit local timezone; calendar operations require
+an explicit zone.
+
+- Wall-clock and monotonic reads, checked instant/duration arithmetic,
+  instant-to-zone conversion, local construction/resolution, parsing, and
+  formatting are in scope. Setting the system clock, timers, alarms, and
+  scheduling APIs are out of scope. `MonotonicInstant` is nondecreasing within
+  a process and supports comparison/subtraction to `Duration`; it cannot be
+  persisted or compared across processes.
+- Duration arithmetic and Instant range overflow return typed errors; values
+  never wrap or saturate. Local-to-instant conversion outside the supported
+  range returns a range error.
+- Local times in a daylight-saving overlap follow JavaScript `Date` compatible
+  disambiguation: choose the earlier instant. Local times in a gap move forward
+  by the gap duration. This retains JavaScript's behavior while requiring the
+  zone explicitly instead of using the host's implicit local zone.
+- `Period` values contain signed integer years, months, weeks, days, hours,
+  minutes, and seconds; nonzero fields must share one sign and apply in that
+  order, with weeks as seven calendar days. Calendar addition uses component
+  overflow normalization analogous to JavaScript Date setters (for example,
+  adding one month to January 31 advances from February 1 by the original
+  day-offset, producing a date in March). Normalize fields in order: construct
+  a normalized year/month pair, then add the day/week/hour/minute/second
+  components as calendar overflow. Apply years/months first, then weeks/days,
+  then local clock fields; resolve the resulting local date-time once so DST
+  disambiguation is deterministic. Reject a final result outside the supported
+  range; do not silently clamp to month-end. All fields resolve
+  as local calendar changes in the explicit zone; fractional elapsed changes
+  use Duration.
+- IANA zones use host tzdb data, including host-recognized aliases; unknown or
+  unavailable zones return typed errors without fallback. The requested zone
+  identifier is preserved; Zone equality compares identifiers. Results may
+  change after host tzdb updates. `ZonedDateTime` value equality and ordering
+  compare only the represented instant, even when zone identifiers differ. A
+  separate representation comparison checks both the instant and zone/local
+  representation; hashing, if provided, must follow value equality.
+- Parsing is explicit by target type: `LocalDate` parses a date-only value;
+  `LocalDateTime` parses an offset-free local date-time; `Instant` parses an
+  offset-bearing ECMAScript date-time string. This preserves the standardized
+  ECMAScript grammar without inheriting `Date.parse`'s historical rule that a
+  date-only string means UTC while an offset-free date-time means host-local
+  time. TLang requires an explicit `Zone` when converting local values to an
+  instant and rejects implementation-defined host-specific formats. Canonical
+  `Instant` output follows the UTC extended-year/ISO shape of
+  `Date.prototype.toISOString`, extended for exact nanoseconds and restricted
+  to TLang's supported year range; it is deterministic, not byte-for-byte
+  equivalent for sub-millisecond values.
+- Localized formatting follows JavaScript `Intl.DateTimeFormat` conventions:
+  callers provide a BCP 47 locale and options; locale identifiers are
+  canonicalized; host locale data is used; no implicit process locale or zone
+  is used. Unsupported locale/options return typed errors without fallback.
+  Calendar/numbering/style options are limited to what host locale services
+  support. Locale formatting needs no capability and may vary with host
+  locale-data/ICU updates; ISO output remains the serialization format.
+
+#### 12.3.4 UUID
+
+UUIDs are 128-bit values using RFC 9562 network byte order and canonical
+hex-and-dash text (case-insensitive input, lowercase output). The API supports
+v3, v4, v5, and v7 only; v1/v2/v6 and custom v8 generation are excluded. V3/v5
+use RFC 9562 namespace bytes and canonical name octets, with built-in DNS/URL
+namespaces and caller-provided namespace UUIDs; v5 is recommended for new
+name-based IDs, while v3 remains for compatibility. V4 uses a cryptographically
+secure system random source and returns a typed error if unavailable. UUIDv3 is
+for interoperability, not a security primitive; it must not be used for
+secrets or adversarially chosen names. V7 uses
+Unix milliseconds and a process-wide generator state shared by all scheduler
+threads. Generation is linearizable: every successful call has a serialization
+point in this state, and UUID byte order is strictly increasing in that
+serialization order within one process, including same-millisecond
+bursts and wall-clock rollback (retain a logical timestamp and advance the
+monotonic tail). If the monotonic tail is exhausted, wait for the clock to
+advance under a bounded deadline based on the monotonic clock, then return a
+typed clock/generator error;
+never wrap the tail or emit an out-of-order UUID. Ordering is not guaranteed
+across process restarts or hosts. UUID parsing validates length, hex, and
+separators; storage parsing accepts any RFC 9562 variant/version, while a
+version-specific parser also checks the requested version. Generation APIs
+create only supported versions. UUID bytes and text conversions are explicit;
+UUID is not a numeric type.
+
+#### 12.3.5 Filesystem
+
+Filesystem APIs use a `Root` capability handle plus relative `Path` values.
+Manifest/runtime grants identify allowed roots. Reject absolute paths and
+traversal outside the root; follow symlinks only when their resolved targets
+remain within the root. Containment checks must be race-safe: resolve and open
+relative to an authorized directory handle. On Linux, use `openat2`-style
+`RESOLVE_BENEATH`/`RESOLVE_IN_ROOT` and `RESOLVE_NO_MAGICLINKS` constraints
+where available; fallback implementations must walk directory handles without
+following untrusted symlinks. Do not authorize by string-prefix checks or by
+checking a path and opening it later. Expose file and directory basics: read/write/append,
+metadata, create/list/remove directories, rename, and open/read/write/close
+streams. Whole-file writes use same-filesystem temporary-file-and-rename for
+atomic visibility (not power-loss durability); append and streams are explicit
+nontransactional operations. Directory entries have name/type/metadata and are
+sorted by name. Whole-file operations use runtime-configurable defaults and
+hard size ceilings; streams are process-scoped, explicitly closeable, and
+cleaned up on process shutdown. Only ordinary files/directories are exposed.
+Operations return typed errors for not-found, permission, invalid path, I/O,
+and limits. Platform support is specified per feature; unsupported targets
+produce clear build diagnostics.
+
+#### 12.3.6 Process, sockets, and lifecycle
+
+- Process APIs accept an allowlisted executable identity and argument vector;
+  there is no shell-string execution. Grants may constrain executable, cwd,
+  arguments, and environment. Child processes are tracked, explicitly
+  awaitable/terminable, and reaped on shutdown. Expose optional stdin/stdout/
+  stderr pipes and bounded capture. A timeout requests termination, waits a
+  bounded grace period, force-kills if needed, then reaps and reports timeout.
+  Child-process I/O and collected output have explicit byte limits; stream
+  handles are process-scoped and cleaned up if not closed.
+- Portable socket APIs cover TCP streams/listeners and UDP unicast/multicast;
+  raw OS descriptors and platform-specific options are not exposed. Handles
+  have explicit close and runtime cleanup. Grants distinguish listen/connect
+  and constrain address/host, port, protocol, and multicast group. Hostnames
+  are resolved and every candidate address is checked against grants; connect
+  to the checked/pinned address, preserve TLS hostname verification for HTTPS,
+  and reauthorize after DNS refresh or redirect. Runtime default deadlines
+  apply, with per-operation overrides bounded by runtime ceilings.
+- Lifecycle APIs expose a cancellation event for SIGINT/SIGTERM, not arbitrary
+  signal handlers or signal sending. The first signal requests graceful
+  cancellation; repeated signals may force termination. Device-specific API
+  design remains out of scope.
+- HTTP client outbound destinations use manifest requests and runtime grants
+  scoped to host/port (and scheme when relevant), including redirect targets.
+  Redirects are not followed automatically by default; opt-in policies are
+  bounded and re-resolve/re-authorize every hop.
+
+### 12.4 Module and compiler boundaries
+
+- Standard specifiers permanently reserve `tlang/`; third-party package names
+  use other specifiers. Breaking standard API changes require a TLang language
+  version change, not a versioned import path. Unknown standard modules/exports
+  are `E-IMPORT`. Implemented local-module binding/export semantics apply
+  unchanged. Syntax not yet supported for local imports (export-star,
+  side-effect-only imports, and anonymous default exports) is unavailable for
+  standard imports until separately implemented and specified.
+- Standard library APIs are declarations/imports at the language surface.
+  Keep compiler intrinsics only where special typing, compile-time metadata,
+  whole-program analysis, or lowering is required. Initially retain DB query
+  typing/row descriptors/transaction lowering, route registration lowering,
+  generated typed JSON binding, and capability-use analysis as compiler
+  services. Ordinary console/env/UUID/time/JSON operations should be callable
+  through imported standard APIs and runtime implementations. Refactor away
+  special cases only when equivalent diagnostics and behavior can be preserved.
+- DB is a PostgreSQL-and-SQLite ORM with decorated user interfaces, CRUD,
+  query building, explicit one-to-one/one-to-many/many-to-many relations,
+  joins/includes, raw SQL, callback and explicit transactions, and no schema
+  migrations. Raw SQL parameters are always separately bound. Raw query results
+  may be typed interfaces or named-column rows of tagged `DbValue`s. The tagged
+  value model covers the built-in type families supported by each engine.
+  Types absent from an engine (for example, PostgreSQL ranges/enums/composites
+  in SQLite) remain engine-specific or require explicit adapters; the API never
+  implies that one backend natively supports another backend's type.
+  Extension-defined types require adapters.
+  Portable query/API semantics are shared where possible, with documented
+  engine-specific type/query capabilities. No hidden relation queries are
+  issued; includes/joins are explicit.
+- HTTP is a framework-style module with server and client APIs. Server routes
+  can use builder registration or decorators; decorators lower to the same
+  deterministic builder registration model. Middleware is ordered and receives
+  request/response context plus a single-use `next()` returning the downstream
+  response. Handlers may use immutable Request/Response values or a Context
+  convenience adapter. Exactly one response may be produced; double sends or
+  return-after-send are typed framework errors. A program has exactly one entry
+  mode: configured App entry or `main()` calling `serve()`, never both. Routes
+  match explicit methods and raw path templates; captured parameters decode
+  once, malformed escapes and encoded slash/backslash are rejected. Request and
+  response bodies stream with bounded convenience helpers. Runtime defaults
+  and hard ceilings govern body sizes and request/idle/connect/total timeouts;
+  app/client configuration may override within ceilings.
+  Ordinary request/response values live for the request operation/fiber; data
+  retained beyond that lifetime requires explicit cloning. Stream-based paths
+  are preferred for large payloads and must propagate backpressure rather than
+  silently buffering without bound.
+- HTTP client APIs include one-shot requests and reusable configured clients.
+  Responses support bounded streaming; redirects are returned to callers by
+  default, with opt-in bounded policies that re-check destination grants.
+  Client redirects and socket networking share one destination-authorization
+  mechanism; a grant alone never authorizes an unchecked resolved address.
+- Platform APIs are portable high-level contracts, implemented Linux-first
+  with a per-feature target support matrix; unsupported target features fail
+  with clear compile/build diagnostics. The capability taxonomy and behaviors
+  above are the contract. The executable receives validated capability
+  requests and runtime grants through an explicit runtime-config input, not
+  ambient undeclared variables. Before binding listeners, spawning children,
+  or running `main`, startup verifies that every manifest request is covered.
+  Static capability families are checked at startup; resource-scoped access is
+  rechecked at use against the validated grants, including path containment and
+  resolved network endpoints. Missing, malformed, unsupported, or insufficient
+  grants fail closed with a diagnostic and nonzero startup status. The concrete
+  manifest/config syntax and deployment handoff format are defined by the
+  project-manifest design.
+- DB operations, HTTP client/server I/O, and streaming system APIs use the
+  existing fiber scheduler's suspension/cancellation model; they do not add a
+  second futures/task runtime. Synchronous-looking APIs may suspend the current
+  fiber but must not block a scheduler thread on network I/O. Cancellation,
+  deadlines, bounded queues/buffers, and cleanup on request abort are mandatory
+  parts of each asynchronous API contract. CPU-only work remains synchronous
+  unless a separately designed worker-pool API is introduced.
+- Database access starts from parameterized execution, transactions, pooling,
+  prepared statements, and generated row mapping. ORM/query-builder syntax is
+  compile-time lowered to those primitives; it must not hide per-record queries,
+  reflection, implicit relation loads, or unbounded result materialization.
+  Raw parameterized SQL remains available for queries the builder cannot
+  express.
+
+#### 12.4.1 HTTP application lifecycle
+
+The initial HTTP implementation lowers a configured `App` to the existing
+`tlang_program.dispatcher` server entry: route and middleware configuration
+builds the dispatcher before `tlang_main`; the runtime remains responsible for
+listeners, schedulers, request fibers, and graceful shutdown. `main()` plus
+`serve()` is convenience syntax that lowers to the same server entry; it must
+not start a blocking server from the current script-mode `main` callback.
+Exactly one mode is emitted: app/server or script. An App value is
+configuration, not a runtime server handle.
+
+This requires a deliberate runtime/driver extension: the generated program
+descriptor must carry the configured app/dispatcher and server mode; `serve()`
+must not recursively invoke `tlang_main`. Preserve the current single-entry
+invariant and define startup/shutdown ownership once in the runtime.
+
+#### 12.4.2 Supported target and host-data contract
+
+Linux is the initial guaranteed server/runtime target. Compiler-only operations
+remain available on supported host platforms. Each standard API declares its
+target support in a feature matrix; unsupported use is diagnosed at build time.
+Host tzdb and locale data are explicit reproducibility boundaries: operations
+are supported only where required host services are available, unavailable
+data returns typed errors, and results may vary across host data versions.
+These differences do not weaken deterministic compiler output or deterministic
+ISO/UUID serialization.
+
+The above decisions close the six design questions at the contract level. Exact
+source declarations, detailed schemas, and concrete manifest syntax remain
+implementation/API specification work; they must conform to these contracts
+and do not reopen selected policy without a language-design revision.
+
+### 12.5 Recommended first implementation boundary
+
+Deliver the draft in independently testable phases rather than one release-sized
+change:
+
+1. **Virtual modules and migration:** implement `tlang/...` resolution, import-
+   gate existing `db`/console behavior, migrate examples, and keep current
+   lowerings/runtime behavior behind the imports.
+2. **Capability foundation:** specify project-manifest/runtime-grant schemas,
+   startup validation, stable errors, environment access, and structured logs.
+3. **Generated/common data APIs:** UUID, time, generic JSON, bounded streaming,
+   and explicit lifetime tests/benchmarks.
+4. **HTTP:** App/dispatcher lowering, server framework, client, destination
+   grants, cancellation/backpressure, and lifecycle integration.
+5. **Privileged system APIs:** rooted filesystem, process, sockets, and
+   lifecycle cancellation after capability enforcement is proven.
+6. **Database expansion (separate DB API specification):** per-engine
+   reachability/linkage, SQLite, compile-time query builder/ORM lowering,
+   relations, adapters, and dynamic values. Do not couple this phase to the
+   initial import migration.
+
+Each phase must define public declarations, ownership/lifetimes, error surface,
+target matrix, security tests, and performance budgets before implementation.
+Preserve existing builtin IDs and lowerings behind imported exports initially.
+This remains a draft, not implemented behavior.
