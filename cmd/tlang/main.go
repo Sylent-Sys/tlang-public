@@ -20,7 +20,7 @@ import (
 
 // version is the compiler version reported by `tlang version`. It is a var so
 // release builds can stamp it with -ldflags "-X main.version=<v>".
-var version = "0.1.0-dev"
+var version = "0.2.0"
 
 // Exit codes form a stable scheme shared by every subcommand:
 //

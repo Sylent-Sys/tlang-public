@@ -10,7 +10,8 @@ workflow uses nothing but the built-in `GITHUB_TOKEN`.
    [`editors/vscode/package.json`](editors/vscode/package.json) to the release
    version without the `v`, then run `npm install` in `editors/vscode/` so
    `package-lock.json` matches. The release fails if the tag and this version
-   differ; the workflow never rewrites it for you.
+   differ; the workflow never rewrites it for you. The compiler and LSP source
+   version defaults must match the release too.
 2. Update the release notes or other user-facing release documentation with
    what the release contains.
 3. Merge both through a PR to `main` and wait for CI to pass on `main`.

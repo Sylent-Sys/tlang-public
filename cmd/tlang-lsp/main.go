@@ -18,6 +18,6 @@ import "os"
 // -ldflags "-X main.version=<v>".
 const serverName = "tlang-lsp"
 
-var version = "0.1.0-dev"
+var version = "0.2.0"
 
 func main() { os.Exit(run(os.Stdin, os.Stdout, os.Stderr)) }

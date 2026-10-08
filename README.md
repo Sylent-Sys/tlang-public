@@ -11,8 +11,8 @@ libpq).
 > codegen → driver → CLI — plus the C runtime are implemented, reviewed, and
 > tested. A TLang program lexes, type-checks, generates a C11 translation unit,
 > links against the runtime, and runs as a native binary that serves HTTP and
-> talks to PostgreSQL. The compiler's current source version is `0.1.0-dev`;
-> tagged release builds report their release version.
+> talks to PostgreSQL. The current release is `0.2.0`; local development builds
+> report that version unless built from a later unreleased source revision.
 
 ## What TLang looks like
 
@@ -119,7 +119,7 @@ source (.ts / .tlang)
 ```sh
 go build -o tlang ./cmd/tlang
 
-./tlang version                 # tlang 0.1.0-dev
+./tlang version                 # tlang 0.2.0
 ./tlang check   examples/app.ts # type-check only (any OS); exit 0 iff no errors
 ./tlang emit-c  examples/app.ts # print the generated C11 to stdout (any OS)
 ./tlang build   examples/app.ts -o app   # compile to a native binary (Linux + C toolchain)
@@ -234,6 +234,7 @@ scripts/        dev.sh / dev.ps1 (run a command inside the container)
 - [`docker/README.md`](docker/README.md) — the `tlang-dev` container.
 - [`docs/LSP.md`](docs/LSP.md) — the language server and the VS Code / Kiro extension.
 - [`RELEASING.md`](RELEASING.md) — how releases are cut, what they contain, and how to install them.
+- [`CHANGELOG.md`](CHANGELOG.md) — user-facing changes by release.
 
 ## Licensing
 
