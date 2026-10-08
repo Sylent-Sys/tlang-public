@@ -33,7 +33,7 @@ const (
 	// string members (§2.7).
 	BuiltinStringLen         // s.len: int64 (field-like)
 	BuiltinStringEq          // s.eq(t: string): bool
-	BuiltinStringSlice       // s.slice(a: int64, b: int64): string, clamped to [0, len]
+	BuiltinStringSlice       // s.slice(a: int64, b: int64): string; negative indices count from the end, then clamp to [0, len]
 	BuiltinStringStartsWith  // s.startsWith(t: string): bool
 	BuiltinStringEndsWith    // s.endsWith(t: string): bool
 	BuiltinStringIndexOf     // s.indexOf(t: string): int64, -1 if absent

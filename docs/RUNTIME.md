@@ -290,7 +290,7 @@ Package `runtime` (import path `tlang/runtime`, standard library only):
 
 1. **OOM aborts the request (503) through a longjmp and is not a catchable Error.** DESIGN §2.8 lists out-of-memory among runtime errors; v1 makes it an abort so that allocation sites need no error checks and `catch` blocks cannot run without memory. Allocation never sets `err`.
 2. **`tlang_fiber.globals` is `struct tl_globals*`** (an incomplete type the generated code completes), so `__fib->globals->g_x` from DESIGN §3.2 compiles; `init_globals` takes `void*`.
-3. **`s.slice(a, b)` follows JavaScript exactly:** a negative index counts from the end, then both indices are clamped to `[0, len]`.
+3. **`s.slice(a, b)` follows JavaScript `String.prototype.slice`:** negative indices count from the end, then both indices are clamped to `[0, len]`; the end index is exclusive, and the result is empty when the resulting start is greater than the end.
 4. **Number parsing and formatting:** `toInt`/`paramInt` accept `[+-]?[0-9]+` only; `float64.toString()` and JSON use the shortest of `%.15g/%.16g/%.17g` that round-trips, print `-0` as `0`; `toString` prints `NaN`/`Infinity`, JSON writes `null` for non-finite values.
 5. **Conversions:** float64 to int32/int64 truncates, saturates, and maps NaN to 0; int64 to int32 wraps.
 6. **One tagged value type** (`tlang_value`) serves console arguments and database parameters (`tlang_pg_param` is a typedef).
@@ -307,9 +307,7 @@ Package `runtime` (import path `tlang/runtime`, standard library only):
 17. **Spec §7.1 `fn`** receives its own fiber (`void (*fn)(Fiber*, void*)`).
 18. **Spec §6.2 `arena_alloc`** tests `n > capacity - offset`, which cannot overflow (the spec's `offset + n > capacity` can).
 
-## 9. Open questions
+## 9. Known limitations and documentation follow-ups
 
-1. `types/builtin.go` documents `s.slice` as "clamped to [0, len]" without the JavaScript negative-index rule that the runtime implements; LANGUAGE.md and the checker documentation should state one rule.
-2. `types/builtin.go` treats every allocating builtin as may-fail because DESIGN §2.8 says OOM sets the error with 503. Under this runtime contract that is redundant (harmless). If the checker drops it, `ctx.setHeader` must stay may-fail (it is marked `Allocates` but not `Fails` today).
-3. DB-mapped interfaces with non-optional fields of interface or array type: reject them in the checker, or have codegen supply `tlang_type_desc.new_row` so they are initialised like `new T()`.
-4. `runtime/build/` should be listed in `.gitignore`.
+1. **String slicing documentation.** `s.slice(a, b)` follows JavaScript `String.prototype.slice`: negative indices count from the end, both indices are clamped to `[0, len]`, the end index is exclusive, and the result is empty when the resulting start is greater than the end (section 8.3). Keep language-facing documentation aligned with this behavior.
+2. **Database row field types.** The checker restricts DB-mapped row fields to database scalar types. Interface and array fields are therefore rejected rather than initialized by row-decoding code. This is an intentional limitation unless DB row construction is extended to initialize such fields; preserve or explicitly revise the restriction and its tests if that contract changes.

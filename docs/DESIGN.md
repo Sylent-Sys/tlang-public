@@ -181,7 +181,7 @@ Rules:
 
 ### 2.7 Strings (§3.4)
 
-Members: `s.len` (int64), `s.eq(t)`, `s.slice(a, b)` (clamped to `[0, len]`, like JavaScript), `s.startsWith(t)`, `s.endsWith(t)`, `s.indexOf(t)` (int64, -1 if absent), `s.clone()` (arena copy), `s.clone_global()` (global heap copy), `s.toInt()` (int64, throws `Error{400, "invalid integer"}`). Also `n.toString()` on `int32`, `int64`, `float64`, `bool` (arena).
+Members: `s.len` (int64), `s.eq(t)`, `s.slice(a, b)` (like JavaScript `String.prototype.slice`: negative indices count from the end, then both indices are clamped to `[0, len]`; the end index is exclusive and the result is empty when the resulting start is greater than the end), `s.startsWith(t)`, `s.endsWith(t)`, `s.indexOf(t)` (int64, -1 if absent), `s.clone()` (arena copy), `s.clone_global()` (global heap copy), `s.toInt()` (int64, throws `Error{400, "invalid integer"}`). Also `n.toString()` on `int32`, `int64`, `float64`, `bool` (arena).
 
 ### 2.8 Errors (§3.6)
 
