@@ -11,7 +11,8 @@ workflow uses nothing but the built-in `GITHUB_TOKEN`.
    version without the `v` (e.g. `0.3.0`), then run `npm install` in
    `editors/vscode/` so `package-lock.json` matches. The release fails if the
    tag and this version differ; the workflow never rewrites it for you.
-2. **Update [`HANDOVER.md`](HANDOVER.md)** with what the release contains.
+2. Update the release notes or other user-facing release documentation with
+   what the release contains.
 3. Merge both through a PR to `main` and wait for CI to pass on `main`.
 4. **Tag and push the tag** from the merged commit on `main`:
 
@@ -63,9 +64,9 @@ use the version `0.0.0-dev+<short sha>` unless they run on a tag.
 
 ## Installing a release
 
-The repository is private: only collaborators can see the release page and
-download its files. Download with the browser while signed in, or with
-`gh release download v0.3.0 --repo Sylent-Sys/tlang`.
+GitHub Releases are publicly visible when the repository is public. Download
+with the browser, or with
+`gh release download v0.3.0 --repo Sylent-Sys/tlang-public`.
 
 ### The compiler
 

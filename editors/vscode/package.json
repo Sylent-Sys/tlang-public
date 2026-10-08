@@ -7,12 +7,12 @@
   "license": "MPL-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Sylent-Sys/tlang.git",
+    "url": "https://github.com/Sylent-Sys/tlang-public.git",
     "directory": "editors/vscode"
   },
-  "homepage": "https://github.com/Sylent-Sys/tlang#readme",
+  "homepage": "https://github.com/Sylent-Sys/tlang-public#readme",
   "bugs": {
-    "url": "https://github.com/Sylent-Sys/tlang/issues"
+    "url": "https://github.com/Sylent-Sys/tlang-public/issues"
   },
   "engines": {
     "vscode": "^1.82.0"

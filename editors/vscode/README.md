@@ -7,7 +7,7 @@ only discovers the binary, launches it, wires it to the editor, and ships the
 TextMate grammar for syntax highlighting.
 
 The server is the Go binary built from `cmd/tlang-lsp/` in the TLang
-repository. See [`docs/LSP.md`](https://github.com/Sylent-Sys/tlang/blob/main/docs/LSP.md)
+repository. See [`docs/LSP.md`](https://github.com/Sylent-Sys/tlang-public/blob/main/docs/LSP.md)
 for the architecture and the full feature set.
 
 ## Install
@@ -17,7 +17,7 @@ for `win32-x64`, `win32-arm64`, `linux-x64`, `linux-arm64`, `darwin-x64`,
 `darwin-arm64`), each with the matching `tlang-lsp` binary inside, so nothing
 else needs installing. In VS Code or Kiro run **Extensions: Install from
 VSIX...** and pick the file for your platform. See
-[`RELEASING.md`](https://github.com/Sylent-Sys/tlang/blob/main/RELEASING.md).
+[`RELEASING.md`](https://github.com/Sylent-Sys/tlang-public/blob/main/RELEASING.md).
 
 ## Build
 
@@ -89,5 +89,5 @@ using the text of open editors (unsaved changes included) and the disk for
 everything else, so imported names resolve, hover, complete, and jump to their
 declarations (F12 / Ctrl+click). A file outside every workspace folder resolves
 imports against its own directory. Buffers that were never saved (`untitled:`)
-are analyzed alone. See [`docs/LSP.md`](https://github.com/Sylent-Sys/tlang/blob/main/docs/LSP.md)
+are analyzed alone. See [`docs/LSP.md`](https://github.com/Sylent-Sys/tlang-public/blob/main/docs/LSP.md)
 for the details.
