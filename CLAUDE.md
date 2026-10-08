@@ -1,13 +1,13 @@
 # TLang project rules
 
-`HANDOVER.md` in the workspace root is the source of truth for project state
-and working method. Read it before starting work. The user switches between
-Claude Code and Kiro (which reads `.kiro/steering/tlang.md`, the same rules),
-and `HANDOVER.md` is the only state the two share.
+Read the relevant source, tests, and documentation before changing code. Check
+`git status` and recent history first, then keep changes focused and verify them
+with the project checks below. Record ongoing project state in issues or pull
+requests when needed.
 
 - **Orchestrate, don't hand-code stages.** Delegate substantial work to a
   workflow or sub-agent with a self-contained brief; verify and commit the
-  result yourself. Details: `HANDOVER.md` → "How work gets done here".
+  result yourself.
 - **Locked code.** Every Go package (`token/ diag/ ast/ types/ lexer/ parser/
   checker/ codegen/ driver/ module/ cmd/tlang/ cmd/tlang-lsp/`), the runtime
   headers, `runtime/embed.go`, `runtime/Makefile`, and `runtime/src/*.c` change
@@ -19,9 +19,8 @@ and `HANDOVER.md` is the only state the two share.
 - **Verify before claiming done.** `go build ./...`, `go vet ./...`,
   `go test ./...`, `gofmt -l .` clean; C/e2e/DB legs in the `tlang-dev`
   container (`docker/README.md`, or `scripts/dev.ps1 <cmd>` from Windows).
-- **Start and finish.** At the start, compare `git log` with `HANDOVER.md` —
-  parallel sessions can land work it doesn't mention. At the end of any piece
-  of work, update `HANDOVER.md`.
+- **Start and finish.** Check `git status` and `git log` before work, and report
+  the changes and verification performed when finished.
 - **Licence:** MPL-2.0 (`LICENSE`), except `runtime/`, which is Apache-2.0
   WITH LLVM-exception (`runtime/LICENSE`). Generated C belongs to the user.
   Changing it is the user's call.

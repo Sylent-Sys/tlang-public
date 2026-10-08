@@ -1,13 +1,13 @@
 # TLang Modules — Design Proposal (v1+)
 
-**Status: IMPLEMENTED (PR #16, merged `92eb233`).** This was the RFC; it is now
+**Status: IMPLEMENTED.** This was the RFC; it is now
 the design of record. The open questions were signed off as: Option A (one C
 translation unit), ES-style syntax, and the full sugar set (aliased imports,
 re-exports, namespace imports, default exports). §0 describes TLang *before*
 modules and is kept for context. Where the shipped code differs from this text,
-the code and `HANDOVER.md` (ROADMAP → PHASE 2) win.
+the code wins.
 
-*Original status:* PROPOSAL / RFC. This document explores adding a
+*Original status:* PROPOSAL / RFC. This document records the design for adding a
 module system (`import` / `export`) to TLang so a program can span many files
 instead of living in one "god file." It is a design to discuss and approve, not
 a committed decision. It is deliberately written to the same bar as
@@ -40,7 +40,7 @@ parser. Concretely (verified against source):
   a build plan for that single translation unit linked against the runtime.
 - Name mangling (`types.StructCName` = `tl_` + `Mangle`, `FuncCName`,
   `MethodCName`) is injective **within one file**, guaranteed by
-  `types.CheckDeclName` (hardened in PR #8 to reserve `tl_`/`globals`/
+  `types.CheckDeclName` (historically hardened in PR #8 to reserve `tl_`/`globals`/
   `_init_globals` and reject cross-declaration C-name collisions).
 
 So a real program must put every interface, function, and route in one file.
@@ -380,7 +380,7 @@ qualifier**:
   `tl_`/`tl_f_`/`tl_m_` family and the reserved `globals`/`_init_globals` shapes
   are preserved; the module tag slots in as an additional, already-reserved
   segment.
-- **`CheckDeclName` / collision checking (PR #8) extends, not changes:** within a
+- **`CheckDeclName` / collision checking (historical PR #8) extends, not changes:** within a
   module the same reservations apply; across modules the module tag keeps names
   injective by construction, so the cross-declaration collision pass now runs
   per module and the global uniqueness is structural. This is an *implementation*

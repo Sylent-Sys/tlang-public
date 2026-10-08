@@ -6,28 +6,29 @@ workflow uses nothing but the built-in `GITHUB_TOKEN`.
 
 ## Cutting a release
 
-1. **Bump the extension version.** Set `"version"` in
+1. **Set the release version.** Set `"version"` in
    [`editors/vscode/package.json`](editors/vscode/package.json) to the release
-   version without the `v` (e.g. `0.3.0`), then run `npm install` in
-   `editors/vscode/` so `package-lock.json` matches. The release fails if the
-   tag and this version differ; the workflow never rewrites it for you.
+   version without the `v`, then run `npm install` in `editors/vscode/` so
+   `package-lock.json` matches. The release fails if the tag and this version
+   differ; the workflow never rewrites it for you.
 2. Update the release notes or other user-facing release documentation with
    what the release contains.
 3. Merge both through a PR to `main` and wait for CI to pass on `main`.
-4. **Tag and push the tag** from the merged commit on `main`:
+4. **Tag and push the tag** from the merged commit on `main`. In the following
+   examples, replace `0.3.0` with the version being released:
 
    ```sh
-   git tag v0.3.0
-   git push origin v0.3.0
+    git tag v0.3.0
+    git push origin v0.3.0
    ```
 
-   A version with a `-` (e.g. `v0.3.0-rc.1`) is published as a prerelease.
+A version with a `-` (for example, `v0.3.0-rc.1`) is published as a prerelease.
 
 The tag push starts the workflow. It publishes only after the full CI
 (including the `tlang-dev` container matrix with PostgreSQL 17), the binaries
 job and the extension job have all passed. If a step fails, fix it on `main`,
-delete the tag (`git push origin :refs/tags/v0.3.0` and `git tag -d v0.3.0`) and
-tag again.
+delete the tag (`git push origin :refs/tags/v0.3.0` and
+`git tag -d v0.3.0`) and tag again.
 
 ## What the pipeline produces
 
@@ -65,7 +66,7 @@ use the version `0.0.0-dev+<short sha>` unless they run on a tag.
 ## Installing a release
 
 GitHub Releases are publicly visible when the repository is public. Download
-with the browser, or with
+with the browser, or replace `v0.3.0` below with the version you want:
 `gh release download v0.3.0 --repo Sylent-Sys/tlang-public`.
 
 ### The compiler

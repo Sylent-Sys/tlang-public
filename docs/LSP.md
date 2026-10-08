@@ -32,8 +32,10 @@ Two pieces talk over LSP:
   [`../editors/vscode/README.md`](../editors/vscode/README.md).
 
   The server reports its name and version in the `initialize` result's
-  `serverInfo` (`tlang-lsp`, `0.1.0-dev` in a plain `go build`; release builds
-  stamp the release version with `-ldflags "-X main.version=<v>"`).
+  `serverInfo` (`tlang-lsp`, currently `0.1.0-dev` in a plain `go build`;
+  release builds stamp the release version with `-ldflags
+  "-X main.version=<v>"`). The VS Code extension has its own package version,
+  currently `0.2.0`; it is not the compiler or language-server version.
 
 ```
 VS Code  ──(open documents)──►  extension (editors/vscode)
