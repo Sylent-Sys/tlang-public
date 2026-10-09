@@ -96,6 +96,10 @@ typedef struct {
     const tlang_program* prog;
     int listen_fd;
     int done_fd;        /* eventfd: the thread adds 1 as its very last action */
+    int ack_fd;         /* main-owned eventfd: scheduler adds 1 after listener close */
+#ifdef TLANG_TEST_HOOKS
+    int test_ack_fd;    /* parent pipe to observe scheduler close in test_main */
+#endif
     int ok;             /* set 1 on successful init before the thread starts */
     char err[256];
 } tl_thread_arg;
@@ -132,6 +136,12 @@ static void* tl_sched_thread(void* argp) {
     tl_startup_arg sa;
 
     tlang_fctx_init_thread(&s->loop_ctx);
+    s->ack_fd = ta->ack_fd;
+#ifdef TLANG_TEST_HOOKS
+    s->test_ack_fd = ta->test_ack_fd;
+#else
+    s->test_ack_fd = -1;
+#endif
 
     sa.s = s;
     sa.prog = ta->prog;
@@ -139,28 +149,46 @@ static void* tl_sched_thread(void* argp) {
     if (tlang_spawn(s, tl_startup_fiber, &sa) == NULL) {
         tlang_log_error("tlang: could not spawn startup fiber");
         s->exit_code = 1;
+        s->now_ns = tlang_now_ns();
+        {
+            uint64_t stop_deadline = 0;
+            tlang_sched_stop(s, &stop_deadline);
+        }
+#ifdef TLANG_TEST_HOOKS
+        if (s->test_ack_fd >= 0) {
+            char byte = 'a';
+            (void)write(s->test_ack_fd, &byte, 1);
+        }
+#endif
         tl_signal_done(done_fd);
         return NULL;
     }
     tlang_sched_run(s);
+#ifdef TLANG_TEST_HOOKS
+    if (s->test_ack_fd >= 0) {
+        char byte = 'a';
+        ssize_t notified;
+        do {
+            notified = write(s->test_ack_fd, &byte, 1);
+        } while (notified < 0 && errno == EINTR);
+    }
+#endif
     tl_signal_done(done_fd);
     return NULL;
 }
 
-/* Main-thread wait of server mode: polls the SIGINT/SIGTERM signalfd and the
- * done eventfd until the first n schedulers' threads have all finished. The
- * first signal requests a stop on all n (unless `stopping` says one was
- * already requested); any signal once stopping force-exits with _exit(1). A
- * poll/read failure is logged, requests a stop if none was yet and returns;
- * the caller's blocking joins then finish the drain, and can no longer be
- * force-exited (accepted: practically unreachable on a valid signalfd and
- * eventfd). Returns 1 if a stop has been requested, else 0. */
-static int tl_wait_schedulers(int sfd, int done_fd, tlang_sched* scheds, int n,
-                              int stopping) {
-    int done = 0, i;
+/* Main-thread wait polls signals, thread completion, and listener-close
+ * acknowledgments independently. It returns only after every started
+ * scheduler has closed its listener and exited. A second signal during that
+ * interval force-exits. On poll/read failure it requests stop once and returns
+ * so callers can perform bounded cleanup. Returns 1 if stopping. */
+static int tl_wait_schedulers(int sfd, int done_fd, int ack_fd,
+                              tlang_sched* scheds, int n, int stopping) {
+    uint64_t done = 0, acks = 0;
+    int i;
 
-    while (done < n) {
-        struct pollfd pfd[2];
+    while (done < (uint64_t)n || acks < (uint64_t)n) {
+        struct pollfd pfd[3];
         int failed = 0;
 
         pfd[0].fd = sfd;
@@ -169,12 +197,16 @@ static int tl_wait_schedulers(int sfd, int done_fd, tlang_sched* scheds, int n,
         pfd[1].fd = done_fd;
         pfd[1].events = POLLIN;
         pfd[1].revents = 0;
-        if (poll(pfd, 2, -1) < 0) {
+        pfd[2].fd = ack_fd;
+        pfd[2].events = POLLIN;
+        pfd[2].revents = 0;
+        if (poll(pfd, 3, -1) < 0) {
             if (errno == EINTR) continue;
             tlang_log_error("tlang: poll failed: %s", strerror(errno));
             failed = 1;
-        } else if (((pfd[0].revents | pfd[1].revents) & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
-            tlang_log_error("tlang: poll reported an error on the signal/done fds");
+        } else if (((pfd[0].revents | pfd[1].revents | pfd[2].revents) &
+                    (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+            tlang_log_error("tlang: poll reported an error on the signal/done/ack fds");
             failed = 1;
         }
 
@@ -195,13 +227,37 @@ static int tl_wait_schedulers(int sfd, int done_fd, tlang_sched* scheds, int n,
             }
         }
 
+        if (!failed && (pfd[2].revents & POLLIN)) {
+            uint64_t count;
+            ssize_t r;
+            do {
+                r = read(ack_fd, &count, sizeof count);
+                if (r == (ssize_t)sizeof count) acks += count;
+            } while (r == (ssize_t)sizeof count);
+            if (r < 0 && errno != EINTR && errno != EAGAIN) {
+                tlang_log_error("tlang: listener acknowledgment eventfd read failed: %s",
+                                strerror(errno));
+                failed = 1;
+            }
+            if (!failed && acks > (uint64_t)n) {
+                tlang_log_error("tlang: received too many listener-close acknowledgments");
+                failed = 1;
+            }
+        }
+
         if (!failed && (pfd[1].revents & POLLIN)) {
             uint64_t count;
-            ssize_t r = read(done_fd, &count, sizeof count);
-            if (r == (ssize_t)sizeof count) {
-                done += (int)count;
-            } else if (r < 0 && errno != EINTR && errno != EAGAIN) {
-                tlang_log_error("tlang: eventfd read failed: %s", strerror(errno));
+            ssize_t r;
+            do {
+                r = read(done_fd, &count, sizeof count);
+                if (r == (ssize_t)sizeof count) done += count;
+            } while (r == (ssize_t)sizeof count);
+            if (r < 0 && errno != EINTR && errno != EAGAIN) {
+                tlang_log_error("tlang: completion eventfd read failed: %s", strerror(errno));
+                failed = 1;
+            }
+            if (!failed && done > (uint64_t)n) {
+                tlang_log_error("tlang: received too many scheduler completion notifications");
                 failed = 1;
             }
         }
@@ -212,6 +268,11 @@ static int tl_wait_schedulers(int sfd, int done_fd, tlang_sched* scheds, int n,
             }
             return 1;
         }
+    }
+    if (done == (uint64_t)n && acks < (uint64_t)n) {
+        tlang_log_error("tlang: missing %llu scheduler listener-close acknowledgment(s)",
+                        (unsigned long long)((uint64_t)n - acks));
+        return 1;
     }
     return stopping;
 }
@@ -325,7 +386,7 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
         tl_thread_arg* targs;
         pthread_t* threads;
         int i, port, started = 0, initialized = 0, startup_failed = 0;
-        int sfd, done_fd, stopping = 0;
+        int sfd, done_fd, ack_fd, stopping = 0;
 
         /* The signals arrive on sfd; each finished scheduler thread adds 1 to
          * done_fd. Both exist before any listener or thread. */
@@ -335,14 +396,21 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
             if (mask_saved) pthread_sigmask(SIG_SETMASK, &old, NULL);
             return 1;
         }
-        done_fd = eventfd(0, EFD_CLOEXEC);
+        done_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
         if (done_fd < 0) {
             tlang_log_error("tlang: eventfd failed: %s", strerror(errno));
             close(sfd);
             if (mask_saved) pthread_sigmask(SIG_SETMASK, &old, NULL);
             return 1;
         }
-
+        ack_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+        if (ack_fd < 0) {
+            tlang_log_error("tlang: acknowledgment eventfd failed: %s", strerror(errno));
+            close(done_fd);
+            close(sfd);
+            if (mask_saved) pthread_sigmask(SIG_SETMASK, &old, NULL);
+            return 1;
+        }
         scheds = (tlang_sched*)calloc((size_t)nthreads, sizeof *scheds);
         targs = (tl_thread_arg*)calloc((size_t)nthreads, sizeof *targs);
         threads = (pthread_t*)calloc((size_t)nthreads, sizeof *threads);
@@ -351,16 +419,34 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
             free(scheds); free(targs); free(threads);
             close(sfd);
             close(done_fd);
+            close(ack_fd);
             if (mask_saved) pthread_sigmask(SIG_SETMASK, &old, NULL);
             return 1;
         }
 
         /* Scheduler 0's listener binds first; with port 0 it decides the
          * shared ephemeral port for the others. */
+#ifdef TLANG_TEST_HOOKS
         for (i = 0; i < nthreads; i++) {
             targs[i].listen_fd = -1;
             scheds[i].listen_fd = -1;
         }
+        {
+            const char* test_ack = getenv("TLANG_TEST_LISTENER_ACK_FD");
+            int64_t parsed;
+            int test_ack_fd = -1;
+            if (test_ack != NULL && tlang_parse_i64(test_ack, strlen(test_ack), &parsed) &&
+                parsed >= 0 && parsed <= 2147483647) {
+                test_ack_fd = (int)parsed;
+            }
+            for (i = 0; i < nthreads; i++) targs[i].test_ack_fd = test_ack_fd;
+        }
+#else
+        for (i = 0; i < nthreads; i++) {
+            targs[i].listen_fd = -1;
+            scheds[i].listen_fd = -1;
+        }
+#endif
         port = cfg.port;
         for (i = 0; i < nthreads; i++) {
             int lfd = tlang_net_listen(cfg.host, port, err, sizeof err);
@@ -411,6 +497,7 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
                 targs[i].cfg = &cfg;
                 targs[i].prog = prog;
                 targs[i].done_fd = done_fd;
+                targs[i].ack_fd = ack_fd;
                 targs[i].ok = 1;
                 if (pthread_create(&threads[i], NULL, tl_sched_thread, &targs[i]) != 0) {
                     tlang_log_error("tlang: pthread_create failed");
@@ -426,7 +513,7 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
              * unused listeners. */
             if (started > 0) {
                 for (i = 0; i < started; i++) tlang_sched_request_stop(&scheds[i]);
-                stopping = tl_wait_schedulers(sfd, done_fd, scheds, started, 1);
+                stopping = tl_wait_schedulers(sfd, done_fd, ack_fd, scheds, started, 1);
             }
             for (i = 0; i < started; i++) pthread_join(threads[i], NULL);
             for (i = 0; i < nthreads; i++) {
@@ -441,6 +528,7 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
             tl_drain_signals(sfd, stopping);
             close(sfd);
             close(done_fd);
+            close(ack_fd);
             if (mask_saved) pthread_sigmask(SIG_SETMASK, &old, NULL);
             return 1;
         }
@@ -448,7 +536,7 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
         /* Run until every scheduler thread has finished: the first signal
          * stops them, a second force-exits; if they all exit on their own
          * (e.g. init_globals failed everywhere) the wait ends too. */
-        stopping = tl_wait_schedulers(sfd, done_fd, scheds, nthreads, 0);
+        stopping = tl_wait_schedulers(sfd, done_fd, ack_fd, scheds, nthreads, 0);
         for (i = 0; i < nthreads; i++) pthread_join(threads[i], NULL);
 
         {
@@ -463,6 +551,7 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
             tl_drain_signals(sfd, stopping);
             close(sfd);
             close(done_fd);
+            close(ack_fd);
             if (mask_saved) pthread_sigmask(SIG_SETMASK, &old, NULL);
             return rc;
         }

@@ -17,6 +17,18 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
+#include <poll.h>
+
+#define TL_ACCEPT_BUDGET 16
+
+/* Check without draining so tlang_sched_run owns the stop transition. */
+static int tl_sched_wake_pending(tlang_sched* s) {
+    struct pollfd pfd;
+    pfd.fd = s->wake_fd;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    return poll(&pfd, 1, 0) > 0 && (pfd.revents & POLLIN) != 0;
+}
 
 /* ------------------------------------------------------------------ *
  * Listener setup
@@ -101,7 +113,13 @@ int tlang_net_local_port(int fd) {
  * ------------------------------------------------------------------ */
 
 void tlang_net_accept_ready(tlang_sched* s) {
-    for (;;) {
+    int accepted = 0;
+    while (accepted < TL_ACCEPT_BUDGET) {
+        /* Leave the wake token for the authoritative scheduler handler. */
+        if (tl_sched_wake_pending(s)) return;
+
+        if (s->stopping || s->listen_fd < 0) return;
+
         /* Stop before accepting when the fiber pool is exhausted: the
          * listener is disarmed until a fiber frees (DESIGN §4.1). */
         if (s->nlive >= s->cfg->max_fibers) {
@@ -117,6 +135,7 @@ void tlang_net_accept_ready(tlang_sched* s) {
             if (errno == ECONNABORTED) continue;
             return;
         }
+        accepted++;
 
         int one = 1;
         setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);

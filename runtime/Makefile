@@ -119,6 +119,22 @@ $(LIB): $(OBJS) | $(BUILD)
 $(BUILD)/tests/%: tests/%.c $(LIB) $(HDRS) | $(BUILD)/tests
 	$(CC) $(RT_CPPFLAGS) $(CPPFLAGS) $(RT_CFLAGS) $(CFLAGS) $(TEST_CFLAGS) -o $@ $< $(LIB) $(LDFLAGS) $(RT_LDLIBS) $(LDLIBS)
 
+# test_main alone uses a private pipe notification to observe the scheduler's
+# listener-close acknowledgment while the runtime consumes its actual eventfd.
+$(BUILD)/obj/sched-test.o: src/sched.c $(HDRS) | $(BUILD)/obj
+	$(CC) $(RT_CPPFLAGS) $(CPPFLAGS) -DTLANG_TEST_HOOKS $(RT_CFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/obj/main-test.o: src/main.c $(HDRS) | $(BUILD)/obj
+	$(CC) $(RT_CPPFLAGS) $(CPPFLAGS) -DTLANG_TEST_HOOKS $(RT_CFLAGS) $(CFLAGS) -c -o $@ $<
+
+TEST_LIB_OBJS := $(filter-out $(BUILD)/obj/main.o $(BUILD)/obj/sched.o,$(OBJS)) \
+	$(BUILD)/obj/main-test.o $(BUILD)/obj/sched-test.o
+$(BUILD)/libtlangrt-test.a: $(TEST_LIB_OBJS) | $(BUILD)
+	$(AR) rcs $@ $(TEST_LIB_OBJS)
+
+$(BUILD)/tests/test_main: tests/test_main.c $(BUILD)/libtlangrt-test.a | $(BUILD)/tests
+	$(CC) $(RT_CPPFLAGS) $(CPPFLAGS) $(RT_CFLAGS) $(CFLAGS) -DTLANG_TEST_HOOKS -o $@ tests/test_main.c $(BUILD)/libtlangrt-test.a $(LDFLAGS) $(RT_LDLIBS) $(LDLIBS)
+
 # tlang.h must compile on its own under the strictest flags.
 $(BUILD)/tests/test_header: TEST_CFLAGS := $(STRICT)
 

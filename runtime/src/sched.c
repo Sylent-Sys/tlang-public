@@ -19,6 +19,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 
@@ -146,7 +147,10 @@ int tlang_sched_init(tlang_sched* s, int id, const tlang_config* cfg,
     s->epfd = -1;
     s->listen_fd = listen_fd;
     s->wake_fd = -1;
+    s->ack_fd = -1;
+    s->test_ack_fd = -1;
     s->stopping = false;
+    s->listener_acknowledged = false;
     s->accept_armed = false;
     s->accept_paused = false;
     s->exit_code = 0;
@@ -568,6 +572,55 @@ static void cancel_interruptible(tlang_sched* s) {
     }
 }
 
+/* Performs the one scheduler-thread-owned stop transition. The listener is
+ * disarmed before close; the main thread learns of completion only afterward. */
+void tlang_sched_stop(tlang_sched* s, uint64_t* stop_deadline) {
+    if (s->stopping) return;
+
+    s->stopping = true;
+    if (s->listen_fd >= 0) {
+        tlang_fd_forget(s, s->listen_fd);
+        if (close(s->listen_fd) != 0) {
+            tlang_log_error("tlang: scheduler %d listener close failed: %s",
+                            s->id, strerror(errno));
+            s->exit_code = 1;
+        }
+        s->listen_fd = -1;
+        s->accept_armed = false;
+    }
+    cancel_interruptible(s);
+    *stop_deadline = s->cfg->shutdown_timeout_ms == 0
+        ? s->now_ns
+        : s->now_ns + (uint64_t)s->cfg->shutdown_timeout_ms * 1000000ull;
+
+    if (s->ack_fd >= 0 && s->listen_fd < 0 && !s->listener_acknowledged) {
+        uint64_t one = 1;
+        ssize_t written;
+        s->listener_acknowledged = true;
+        do {
+            written = write(s->ack_fd, &one, sizeof one);
+        } while (written < 0 && errno == EINTR);
+        if (written != (ssize_t)sizeof one) {
+            tlang_log_error("tlang: scheduler %d listener-close acknowledgment failed: %s",
+                            s->id, written < 0 ? strerror(errno) : "short eventfd write");
+            s->exit_code = 1;
+        }
+        if (s->test_ack_fd >= 0) {
+            char byte = 'a';
+            ssize_t notified;
+            do {
+                notified = write(s->test_ack_fd, &byte, 1);
+            } while (notified < 0 && errno == EINTR);
+        }
+    }
+}
+
+static void handle_wake(tlang_sched* s, uint64_t* stop_deadline) {
+    uint64_t drain;
+    while (read(s->wake_fd, &drain, sizeof drain) > 0) { }
+    tlang_sched_stop(s, stop_deadline);
+}
+
 int tlang_sched_run(tlang_sched* s) {
     struct epoll_event events[256];
     uint64_t stop_deadline = 0;
@@ -611,50 +664,45 @@ int tlang_sched_run(tlang_sched* s) {
             if (errno == EINTR) continue;
             tlang_log_error("epoll_wait failed: %s", strerror(errno));
             s->exit_code = 1;
+            s->now_ns = tlang_now_ns();
+            tlang_sched_stop(s, &stop_deadline);
             break;
         }
 
-        for (i = 0; i < n; i++) {
-            int fd = events[i].data.fd;
-            uint32_t re = events[i].events;
-
-            if (fd == s->wake_fd) {
-                uint64_t drain;
-                while (read(s->wake_fd, &drain, sizeof drain) > 0) { }
-                if (!s->stopping) {
-                    s->stopping = true;
-                    /* Close the listener first. */
-                    if (s->listen_fd >= 0) {
-                        tlang_fd_forget(s, s->listen_fd);
-                        close(s->listen_fd);
-                        s->listen_fd = -1;
-                        s->accept_armed = false;
-                    }
-                    cancel_interruptible(s);
-                    stop_deadline = s->cfg->shutdown_timeout_ms == 0
-                        ? s->now_ns
-                        : s->now_ns + (uint64_t)s->cfg->shutdown_timeout_ms * 1000000ull;
-                }
-                continue;
+        {
+            int batch_listen_fd = s->listen_fd;
+            /* Handle stop controls before ordinary readiness in this batch. */
+            for (i = 0; i < n; i++) {
+                if (events[i].data.fd == s->wake_fd) handle_wake(s, &stop_deadline);
             }
 
-            if (fd == s->listen_fd) {
-                /* Level-triggered: accept until EAGAIN. */
-                tlang_net_accept_ready(s);
-                continue;
-            }
+            for (i = 0; i < n; i++) {
+                int fd = events[i].data.fd;
+                uint32_t re = events[i].events;
 
-            /* Validate against the fd table (drop stale one-shot events). */
-            if ((size_t)fd < s->nfds && s->fds[fd].registered &&
-                s->fds[fd].waiter != NULL) {
-                Fiber* w = s->fds[fd].waiter;
-                int result;
-                if (w->waiting_fd != fd && w->waiting_fd2 != fd) {
-                    /* Stale: the waiter moved on. */
+                if (fd == s->wake_fd) {
                     continue;
                 }
-                result = fd_event_result(w, fd, re);
-                wake_fd_waiter(s, w, result);
+
+                if (fd == batch_listen_fd) {
+                    if (!s->stopping && s->listen_fd == batch_listen_fd) {
+                        tlang_net_accept_ready(s);
+                    }
+                    continue;
+                }
+
+                /* Validate against the fd table (drop stale one-shot events). */
+                if ((size_t)fd < s->nfds && s->fds[fd].registered &&
+                    s->fds[fd].waiter != NULL) {
+                    Fiber* w = s->fds[fd].waiter;
+                    int result;
+                    if (w->waiting_fd != fd && w->waiting_fd2 != fd) {
+                        /* Stale: the waiter moved on. */
+                        continue;
+                    }
+                    result = fd_event_result(w, fd, re);
+                    wake_fd_waiter(s, w, result);
+                }
             }
         }
 
