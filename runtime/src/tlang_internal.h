@@ -380,7 +380,10 @@ struct tlang_sched {
     int epfd;                        /* epoll instance [sched.c] */
     int listen_fd;                   /* own SO_REUSEPORT listener, -1 in script mode [main.c] */
     int wake_fd;                     /* eventfd in the epoll set: stop requests [sched.c] */
+    int ack_fd;                      /* main-owned eventfd for listener-close acknowledgments, -1 outside server threads [main.c] */
+    int test_ack_fd;                 /* test-only close notification pipe, -1 in production */
     bool stopping;                   /* a stop request was received [sched.c] */
+    bool listener_acknowledged;      /* this scheduler published its close acknowledgment [sched.c] */
     bool accept_armed;               /* listener registered for EPOLLIN [sched.c] */
     bool accept_paused;              /* disarmed because the fiber pool is exhausted [sched.c] */
     int exit_code;                   /* tlang_sched_run result [main.c] */
@@ -415,12 +418,16 @@ int tlang_sched_init(tlang_sched* s, int id, const tlang_config* cfg,
  * listener) and no fiber is live. One iteration: run every READY fiber,
  * compute the epoll timeout from the earliest deadline, epoll_wait, then
  * dispatch: listen_fd readable -> tlang_net_accept_ready, wake_fd -> stop
- * request, other fds -> wake the waiter recorded in the fd table; then wake
- * the fibers whose deadline passed and refresh now_ns.
- * On a stop request it closes the listener, cancels interruptible waits and
- * wait queues, and gives in-flight fibers cfg->shutdown_timeout_ms before
- * returning anyway. Returns s->exit_code. */
+ * request (control events before listeners), other fds -> wake the waiter
+ * recorded in the fd table; then wake the fibers whose deadline passed and
+ * refresh now_ns. On a stop request it closes the listener and acknowledges
+ * that close, cancels interruptible waits and wait queues, and gives in-flight
+ * fibers cfg->shutdown_timeout_ms before returning anyway. Returns s->exit_code. */
 int tlang_sched_run(tlang_sched* s);
+
+/* Performs the scheduler-thread-only stop transition, including listener close,
+ * cancellation, deadline setup and one close acknowledgment when ack_fd >= 0. */
+void tlang_sched_stop(tlang_sched* s, uint64_t* stop_deadline);
 
 /* Closes the epoll set, eventfd, listener and fd table, destroys the fiber
  * pool and the DB pool. No fiber may be live. */

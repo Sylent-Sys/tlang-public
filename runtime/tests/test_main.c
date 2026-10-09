@@ -28,6 +28,51 @@
 #include <unistd.h>
 
 static int failures;
+static void nap_ms(int ms);
+
+typedef struct {
+    int port;
+    int stop;
+    unsigned long long attempts;
+    pthread_mutex_t lock;
+} tl_connect_flood;
+
+static int flood_stopped(tl_connect_flood* flood) {
+    int stop;
+    pthread_mutex_lock(&flood->lock);
+    stop = flood->stop;
+    pthread_mutex_unlock(&flood->lock);
+    return stop;
+}
+
+static unsigned long long flood_attempts(tl_connect_flood* flood) {
+    unsigned long long attempts;
+    pthread_mutex_lock(&flood->lock);
+    attempts = flood->attempts;
+    pthread_mutex_unlock(&flood->lock);
+    return attempts;
+}
+
+static void* connect_flood_thread(void* arg) {
+    tl_connect_flood* flood = (tl_connect_flood*)arg;
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons((unsigned short)flood->port);
+    sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    while (!flood_stopped(flood)) {
+        int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+        if (fd >= 0) {
+            (void)connect(fd, (struct sockaddr*)&sa, sizeof sa);
+            close(fd);
+        }
+        pthread_mutex_lock(&flood->lock);
+        flood->attempts++;
+        pthread_mutex_unlock(&flood->lock);
+        nap_ms(1);
+    }
+    return NULL;
+}
 
 #define TL_DEADLINE_MS 30000
 static long long now_ms(void);
@@ -226,6 +271,7 @@ static void nap_ms(int ms) {
  * reading one byte from g_release[0]. It writes no response (-> 404). */
 static int g_entered[2] = {-1, -1};
 static int g_release[2] = {-1, -1};
+static int g_test_ack_pipe[2] = {-1, -1};
 
 static void held_dispatcher(tlang_fiber* fib, tlang_ctx* ctx) {
     char b = 'e';
@@ -343,6 +389,7 @@ static int child_start(tl_child* c, const tlang_program* prog, const char* port,
         close(ep[1]);
         close_fd(&g_entered[0]);  /* parent's ends of the held-drain pipes */
         close_fd(&g_release[1]);
+        close_fd(&g_test_ack_pipe[0]);
         unsetenv("TLANG_DATABASE_URL");
         unsetenv("DATABASE_URL");
         setenv("TLANG_HOST", "127.0.0.1", 1);
@@ -359,6 +406,7 @@ static int child_start(tl_child* c, const tlang_program* prog, const char* port,
     close(ep[1]);
     close_fd(&g_entered[1]);  /* child's ends */
     close_fd(&g_release[0]);
+    close_fd(&g_test_ack_pipe[1]);
     c->errfd = ep[0];
     fcntl(c->errfd, F_SETFL, fcntl(c->errfd, F_GETFL) | O_NONBLOCK);
     return 0;
@@ -517,11 +565,11 @@ static int send_request(int port) {
     return fd;
 }
 
-/* Retries connecting to 127.0.0.1:port until it is refused (the listener was
- * closed), within the deadline. Connections that still succeed are closed at
- * once. Returns 0 once refused, -1 on timeout or another error. */
-static int wait_listener_closed(int port) {
-    long long deadline = now_ms() + TL_DEADLINE_MS;
+/* Retries connecting until refused. Connections that still succeed are closed
+ * immediately. The bounded form checks prompt listener closure independently
+ * of signal consumption while retaining the external refusal contract. */
+static int wait_listener_closed_by(int port, int timeout_ms) {
+    long long deadline = now_ms() + timeout_ms;
     struct sockaddr_in sa;
     memset(&sa, 0, sizeof sa);
     sa.sin_family = AF_INET;
@@ -587,27 +635,76 @@ static void test_server_graceful_idle(void) {
 /* ---- SIGINT during an in-flight request: the scheduler stops (listener
  * closed) while the request fiber is parked, and its response is still
  * delivered ---- */
-static void test_server_graceful_inflight(void) {
+static void run_server_graceful_inflight(int busy_accept) {
     tlang_program prog;
     tl_child c;
     char resp[256];
     int before = failures, port, sock = -1;
+    tl_connect_flood flood;
+    pthread_t flood_threads[4];
+    int flood_started = 0, flood_lock_initialized = 0;
 
     server_prog(&prog, parked_dispatcher);
+    if (busy_accept) {
+        char fd_env[32];
+        CHECK(pipe(g_test_ack_pipe) == 0);
+        snprintf(fd_env, sizeof fd_env, "%d", g_test_ack_pipe[1]);
+        setenv("TLANG_TEST_LISTENER_ACK_FD", fd_env, 1);
+    }
     if (held_pipes_open(1) != 0 || child_start(&c, &prog, "0", "1") != 0) {
+        unsetenv("TLANG_TEST_LISTENER_ACK_FD");
+        close_fd(&g_test_ack_pipe[0]);
+        close_fd(&g_test_ack_pipe[1]);
         held_pipes_close();
         CHECK(!"pipe/fork failed");
         return;
     }
+    unsetenv("TLANG_TEST_LISTENER_ACK_FD");
     port = child_wait_ready(&c);
     CHECK(port > 0);
     if (port > 0) sock = send_request(port);
     CHECK(sock >= 0);
     CHECK(read_byte_by(g_entered[0], now_ms() + TL_DEADLINE_MS) == 0);
+    if (busy_accept) {
+        int i;
+        memset(&flood, 0, sizeof flood);
+        flood.port = port;
+        if (pthread_mutex_init(&flood.lock, NULL) == 0) {
+            flood_lock_initialized = 1;
+            for (i = 0; i < 4; i++) {
+                if (pthread_create(&flood_threads[i], NULL, connect_flood_thread, &flood) != 0) {
+                    CHECK(!"could not start connect flood thread");
+                    break;
+                }
+                flood_started++;
+            }
+        } else {
+            CHECK(!"could not initialize connect flood mutex");
+        }
+        if (flood_started > 0) {
+            long long deadline = now_ms() + 2000;
+            while (flood_attempts(&flood) < 1000 && now_ms() < deadline) nap_ms(1);
+            CHECK(flood_attempts(&flood) >= 1000);
+        }
+    }
     CHECK(kill(c.pid, SIGINT) == 0);
     CHECK(child_wait_consumed(&c, SIGINT) == 0);
-    /* The scheduler handled the stop while the request is still parked. */
-    if (port > 0) CHECK(wait_listener_closed(port) == 0);
+    /* Observe scheduler-thread close acknowledgment independently. */
+    if (busy_accept) CHECK(read_byte_by(g_test_ack_pipe[0], now_ms() + 2000) == 0);
+    else if (port > 0) CHECK(wait_listener_closed_by(port, 2000) == 0);
+    if (flood_started > 0) {
+        int i;
+        pthread_mutex_lock(&flood.lock);
+        flood.stop = 1;
+        pthread_mutex_unlock(&flood.lock);
+        for (i = 0; i < flood_started; i++) pthread_join(flood_threads[i], NULL);
+    }
+    if (flood_lock_initialized) {
+        pthread_mutex_destroy(&flood.lock);
+    }
+    /* TCP handshakes already queued before close can still complete at kernel level. */
+    close_fd(&g_test_ack_pipe[0]);
+    close_fd(&g_test_ack_pipe[1]);
     CHECK(write_byte(g_release[1]) == 0);
     if (sock >= 0) {
         CHECK(read_response(sock, resp, sizeof resp, 9) >= 9);
@@ -618,6 +715,14 @@ static void test_server_graceful_inflight(void) {
     CHECK(child_exit_code(&c) == 0);
     held_pipes_close();
     child_report(&c, "graceful_inflight", before);
+}
+
+static void test_server_graceful_inflight(void) {
+    run_server_graceful_inflight(0);
+}
+
+static void test_server_graceful_busy_accept(void) {
+    run_server_graceful_inflight(1);
 }
 
 /* ---- a second signal during a held drain force-exits with status 1 ---- */
@@ -749,7 +854,10 @@ int main(void) {
     test_script_signal(SIGTERM);
 
     test_server_graceful_idle();
+    setenv("TLANG_TEST_LISTENER_ACK_FD", "-1", 1);
     test_server_graceful_inflight();
+    unsetenv("TLANG_TEST_LISTENER_ACK_FD");
+    test_server_graceful_busy_accept();
     test_server_forced(SIGINT, "forced_sigint_sigint");
     test_server_forced(SIGTERM, "forced_sigint_sigterm");
     test_server_all_init_fail();
