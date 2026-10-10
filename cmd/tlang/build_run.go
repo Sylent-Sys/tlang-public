@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"tlang/codegen"
 	"tlang/driver"
+	"tlang/project"
 )
 
 // newDriver is the seam tests use to substitute a hermetic driver without
@@ -52,8 +52,9 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	release := fs.Bool("release", false, "build with release optimizations (-O3 -DNDEBUG)")
 	cc := fs.String("cc", "", "C compiler to use: gcc, clang, or tcc (default: auto-select)")
+	grants := fs.String("tlang-grants", "", "runtime grants JSON path for a manifest project")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "usage: tlang run <file.ts> [--release] [--cc gcc|clang|tcc]")
+		fmt.Fprintln(stderr, "usage: tlang run <file.ts> [--release] [--cc gcc|clang|tcc] [--tlang-grants path]")
 		fs.PrintDefaults()
 	}
 
@@ -66,7 +67,7 @@ func runRun(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	return buildOrRun(false, file, "", *release, *cc, stdout, stderr)
+	return buildOrRun(false, file, "", *release, *cc, *grants, stdout, stderr)
 }
 
 // runBuild implements
@@ -80,6 +81,7 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 	out := fs.String("o", "", "output executable path (default: source base name without extension)")
 	release := fs.Bool("release", false, "build with release optimizations (-O3 -DNDEBUG)")
 	cc := fs.String("cc", "", "C compiler to use: gcc, clang, or tcc (default: auto-select)")
+	grants := fs.String("tlang-grants", "", "runtime grants JSON path for a manifest project (run only)")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "usage: tlang build <file.ts> [-o out] [--release] [--cc gcc|clang|tcc]")
 		fs.PrintDefaults()
@@ -93,8 +95,12 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 		fs.Usage()
 		return exitUsage
 	}
+	if *grants != "" {
+		fmt.Fprintln(stderr, "tlang build: --tlang-grants is only valid for run")
+		return exitUsage
+	}
 
-	return buildOrRun(true, file, *out, *release, *cc, stdout, stderr)
+	return buildOrRun(true, file, *out, *release, *cc, "", stdout, stderr)
 }
 
 // buildOrRun is the shared body of `run` and `build`. isBuild distinguishes the
@@ -107,23 +113,48 @@ func runBuild(args []string, stdout, stderr io.Writer) int {
 // the executable at plan.Output and run has executed the program (tcc -run in
 // place, or the compiled artifact otherwise); exitOK is returned. On a driver
 // execution failure the error is surfaced and exitFail is returned.
-func buildOrRun(isBuild bool, path, outFlag string, release bool, cc string, stdout, stderr io.Writer) int {
+func buildOrRun(isBuild bool, path, outFlag string, release bool, cc, grantsPath string, stdout, stderr io.Writer) int {
 	kind, ok := parseCC(cc)
 	if !ok {
 		fmt.Fprintf(stderr, "tlang: unknown --cc value %q (want gcc, clang, or tcc)\n", cc)
 		return exitUsage
 	}
 
+	path, projectRoot, discovered, ok := resolveProjectInputWithManifest(path, stderr)
+	if !ok {
+		return exitUsage
+	}
 	if _, ok := loadSource(path, stderr); !ok {
 		return exitUsage
 	}
 
-	res := runFrontendGraph(path, stderr)
+	res := runFrontendGraph(path, projectRoot, discovered, stderr)
 	if res.hasErrs {
 		return exitFail
 	}
+	if !isBuild && grantsPath != "" {
+		resolvedPath, pathErr := filepath.Abs(grantsPath)
+		if pathErr != nil {
+			fmt.Fprintln(stderr, "tlang: cannot resolve runtime grants path")
+			return exitUsage
+		}
+		grantsPath = resolvedPath
+	}
+	if !isBuild && discovered != nil {
+		if grantsPath == "" {
+			fmt.Fprintln(stderr, "tlang: project runtime grants required; pass --tlang-grants <path>")
+			return exitUsage
+		}
+		if _, err := readAndValidateGrants(discovered, grantsPath); err != nil {
+			fmt.Fprintln(stderr, "tlang: project runtime grants are missing, invalid, or insufficient")
+			return exitFail
+		}
+	} else if !isBuild && discovered == nil && grantsPath != "" {
+		fmt.Fprintln(stderr, "tlang: --tlang-grants requires a tlang.json project")
+		return exitUsage
+	}
 
-	cbytes, err := codegen.Emit(res.prog, res.info)
+	cbytes, err := emitProgram(res)
 	if err != nil {
 		fmt.Fprintf(stderr, "tlang: %v\n", err)
 		return exitFail
@@ -165,6 +196,22 @@ func buildOrRun(isBuild bool, path, outFlag string, release bool, cc string, std
 	if err != nil {
 		return reportPlanError(err, stderr)
 	}
+	if !isBuild && plan.Compiler.Kind == driver.CompilerTCC && grantsPath != "" {
+		step := &plan.Steps[len(plan.Steps)-1]
+		args := runtimeGrantArgs(grantsPath)
+		runIndex := -1
+		for i, arg := range step.Argv {
+			if arg == "-run" {
+				runIndex = i
+				break
+			}
+		}
+		if runIndex >= 0 {
+			step.Argv = append(step.Argv[:runIndex], append([]string{"-run"}, append(args, step.Argv[runIndex+1:]...)...)...)
+		} else {
+			step.Argv = append(step.Argv, args...)
+		}
+	}
 
 	// Execute the assembled plan: extract the runtime and run each step. On
 	// success build has produced the executable at plan.Output and run has
@@ -181,7 +228,7 @@ func buildOrRun(isBuild bool, path, outFlag string, release bool, cc string, std
 	// For a gcc/clang run the plan produced an executable at plan.Output but did
 	// not execute it (only tcc's -run form runs in place). Execute it now.
 	if !isBuild && plan.Output != "" {
-		runCmd := exec.CommandContext(context.Background(), plan.Output)
+		runCmd := exec.CommandContext(context.Background(), plan.Output, runtimeGrantArgs(grantsPath)...)
 		runCmd.Stdout = stdout
 		runCmd.Stderr = stderr
 		if err := runCmd.Run(); err != nil {
@@ -194,6 +241,26 @@ func buildOrRun(isBuild bool, path, outFlag string, release bool, cc string, std
 		fmt.Fprintf(stderr, "tlang: built %s\n", plan.Output)
 	}
 	return exitOK
+}
+
+func runtimeGrantArgs(grantsPath string) []string {
+	if grantsPath == "" {
+		return nil
+	}
+	return []string{"--tlang-grants", grantsPath}
+}
+
+func readAndValidateGrants(discovered *project.Project, grantsPath string) (*project.Grants, error) {
+	f, err := os.Open(grantsPath)
+	if err != nil {
+		return nil, project.ErrInvalidGrants
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, project.MaxDocumentBytes+1))
+	if err != nil || len(data) > project.MaxDocumentBytes {
+		return nil, project.ErrInvalidGrants
+	}
+	return project.ParseAndValidateGrants(data, discovered.Manifest, discovered.ManifestSHA256)
 }
 
 // reportPlanError maps a driver.Plan error to a user-facing stderr message and

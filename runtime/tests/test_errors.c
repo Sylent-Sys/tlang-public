@@ -50,19 +50,33 @@ static void test_throw_take(void) {
     CHECK(!g_fib.err);
     tlang_throw(&g_fib, 404, TLANG_STR("not found"));
     CHECK(g_fib.err && g_fib.error.status == 404 && str_is(g_fib.error.message, "not found"));
+    CHECK(str_is(g_fib.error.category, "internal") && str_is(g_fib.error.code, "internal"));
+
+    tlang_throw_typed(&g_fib, 404, TLANG_STR("missing"), TLANG_STR("not_found"), TLANG_STR("resource_missing"));
+    CHECK(g_fib.err && str_is(g_fib.error.category, "not_found") && str_is(g_fib.error.code, "resource_missing"));
+
+    /* Throwing a caught value preserves category and code. */
+    e = tlang_take_error(&g_fib);
+    tlang_throw_value(&g_fib, e);
+    CHECK(g_fib.err && g_fib.error.status == 404 && str_is(g_fib.error.category, "not_found"));
+    CHECK(str_is(g_fib.error.code, "resource_missing"));
 
     /* A later throw replaces the pending error. */
     tlang_throw(&g_fib, 500, TLANG_STR("boom"));
     CHECK(g_fib.error.status == 500 && str_is(g_fib.error.message, "boom"));
+    CHECK(str_is(g_fib.error.category, "internal") && str_is(g_fib.error.code, "internal"));
 
     /* take_error returns the pending error and clears it. */
     e = tlang_take_error(&g_fib);
     CHECK(e.status == 500 && str_is(e.message, "boom"));
+    CHECK(str_is(e.category, "internal") && str_is(e.code, "internal"));
     CHECK(!g_fib.err);
+    CHECK(str_is(g_fib.error.category, "") && str_is(g_fib.error.code, ""));
 
     /* With no error pending, take returns {0, ""}. */
     e = tlang_take_error(&g_fib);
     CHECK(e.status == 0 && str_is(e.message, ""));
+    CHECK(str_is(e.category, "") && str_is(e.code, ""));
 }
 
 static void test_throw_null_message(void) {
@@ -70,6 +84,7 @@ static void test_throw_null_message(void) {
     g_fib.err = 0;
     tlang_throw(&g_fib, 500, TLANG_STR_NULL);  /* NULL message stored as "" */
     CHECK(g_fib.err && g_fib.error.message.data != NULL && g_fib.error.message.len == 0);
+    CHECK(str_is(g_fib.error.category, "internal") && str_is(g_fib.error.code, "internal"));
 }
 
 static void test_throw_value(void) {
@@ -78,6 +93,7 @@ static void test_throw_value(void) {
     g_fib.err = 0;
     tlang_throw_value(&g_fib, src);
     CHECK(g_fib.err && g_fib.error.status == 418 && str_is(g_fib.error.message, "explicit"));
+    CHECK(str_is(g_fib.error.category, "internal") && str_is(g_fib.error.code, "internal"));
 }
 
 static void test_throw_fmt(void) {
@@ -85,8 +101,9 @@ static void test_throw_fmt(void) {
     arena_setup(1 << 16);
 
     g_fib.err = 0;
-    tlang_throw_fmt(&g_fib, 400, "bad value %d for %s", 42, "key");
+    tlang_throw_fmt_typed(&g_fib, 400, TLANG_STR("invalid_input"), TLANG_STR("invalid_integer"), "bad value %d for %s", 42, "key");
     CHECK(g_fib.err && g_fib.error.status == 400);
+    CHECK(str_is(g_fib.error.category, "invalid_input") && str_is(g_fib.error.code, "invalid_integer"));
     CHECK(str_is(g_fib.error.message, "bad value 42 for key"));
     /* The message lives in the arena, independent of the format args. */
     CHECK(g_fib.error.message.data != NULL);
@@ -100,11 +117,14 @@ static void test_throw_fmt(void) {
         tlang_throw_fmt(&g_fib, 500, "%s", big);
         CHECK(g_fib.err && g_fib.error.message.len == sizeof(big) - 1);
         CHECK(memcmp(g_fib.error.message.data, big, sizeof(big) - 1) == 0);
+        CHECK(str_is(g_fib.error.category, "internal") && str_is(g_fib.error.code, "internal"));
     }
 }
 
 int main(void) {
     test_throw_take();
+    tlang_clear_error(&g_fib);
+    CHECK(str_is(g_fib.error.category, "") && str_is(g_fib.error.code, ""));
     test_throw_null_message();
     test_throw_value();
     test_throw_fmt();

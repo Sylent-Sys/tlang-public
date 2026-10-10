@@ -6,6 +6,9 @@ import (
 )
 
 func TestBuiltinTable(t *testing.T) {
+	if BuiltinConsoleInfo != 45 || BuiltinEnv != BuiltinConsoleInfo+1 || BuiltinEnvGet != BuiltinEnv+1 {
+		t.Fatalf("appended builtin IDs = %d, %d, %d; existing ID layout changed", BuiltinConsoleInfo, BuiltinEnv, BuiltinEnvGet)
+	}
 	seen := map[[2]any]BuiltinID{}
 	for id := BuiltinInvalid + 1; id < numBuiltins; id++ {
 		in := id.Info()
@@ -29,6 +32,21 @@ func TestBuiltinTable(t *testing.T) {
 	}
 	if BuiltinID(-1).Info().Name != "invalid builtin" || numBuiltins.Info().Name != "invalid builtin" {
 		t.Error("out-of-range Info")
+	}
+}
+
+func TestStructuredConsoleAndJsonValueSignatures(t *testing.T) {
+	for name, id := range map[string]BuiltinID{"debug": BuiltinConsoleDebugFields, "info": BuiltinConsoleInfoFields, "warn": BuiltinConsoleWarnFields} {
+		in := id.Info()
+		if in.Name != name+"-fields" || len(in.Params) != 2 || !IsString(in.Params[0]) || !IsOptional(in.Params[1]) || !IsBasic(NonOptional(in.Params[1]), JsonValue) || !IsVoid(in.Result) {
+			t.Errorf("console.%s signature = %+v", name, in)
+		}
+	}
+	if !IsBasic(BuiltinJsonFromNull.Info().Result, JsonValue) || !IsOptional(BuiltinJsonAsString.Info().Result) {
+		t.Fatal("JsonValue constructor/accessor signatures")
+	}
+	if StandardNamespaceMember(BuiltinConsole, "log") != BuiltinInvalid {
+		t.Fatal("legacy console methods must not be source-visible")
 	}
 }
 
@@ -71,18 +89,28 @@ func TestBuiltinLookup(t *testing.T) {
 			t.Errorf("MemberOf(%v, %q) = %v, want %v", m.recv, m.name, got, m.want)
 		}
 	}
+	if got := ErrorMemberOf("category"); got != BuiltinErrorCategory {
+		t.Errorf("ErrorMemberOf(category) = %v, want %v", got, BuiltinErrorCategory)
+	}
+	if got := ErrorMemberOf("code"); got != BuiltinErrorCode {
+		t.Errorf("ErrorMemberOf(code) = %v, want %v", got, BuiltinErrorCode)
+	}
+	if ErrorBuiltinInfo(BuiltinErrorCategory).Result != tString || ErrorBuiltinInfo(BuiltinErrorCode).Result != tString {
+		t.Fatal("Error.category and Error.code must have string type")
+	}
 	ns := []struct {
 		ns   BuiltinID
 		name string
 		want BuiltinID
 	}{
-		{BuiltinConsole, "log", BuiltinConsoleLog},
-		{BuiltinConsole, "error", BuiltinConsoleError},
+		{BuiltinConsole, "log", BuiltinInvalid},
+		{BuiltinConsole, "error", BuiltinInvalid},
 		{BuiltinConsole, "warn", BuiltinInvalid},
 		{BuiltinDB, "execute", BuiltinDBExecute},
 		{BuiltinDB, "query", BuiltinDBQuery},
 		{BuiltinDB, "queryOne", BuiltinDBQueryOne},
 		{BuiltinDB, "transaction", BuiltinDBTransaction},
+		{BuiltinEnv, "get", BuiltinEnvGet},
 		{BuiltinStringLen, "x", BuiltinInvalid},
 	}
 	for _, m := range ns {
@@ -94,11 +122,17 @@ func TestBuiltinLookup(t *testing.T) {
 		ConversionOf(f64) != BuiltinConvFloat64 || ConversionOf(str) != BuiltinInvalid {
 		t.Error("ConversionOf")
 	}
+	if StandardNamespaceMember(BuiltinEnv, "get") != BuiltinEnvGet {
+		t.Error("standard env namespace must expose get")
+	}
+	if StandardBuiltin(BuiltinEnv) != StandardExportObject(StandardExportSystemEnv) {
+		t.Error("env standard export must preserve canonical builtin identity")
+	}
 }
 
 func TestBuiltinProperties(t *testing.T) {
 	// Exactly the operations tlang.h documents as "May fail".
-	mayFail := []BuiltinID{BuiltinStringToInt, BuiltinCtxParamInt, BuiltinCtxSetHeader, BuiltinDBExecute,
+	mayFail := []BuiltinID{BuiltinStringToInt, BuiltinCtxParamInt, BuiltinCtxSetHeader, BuiltinEnvGet, BuiltinDBExecute,
 		BuiltinDBQuery, BuiltinDBQueryOne, BuiltinDBTransaction, BuiltinTxExecute, BuiltinTxQuery, BuiltinTxQueryOne}
 	for _, id := range mayFail {
 		if !id.MayFail() {
@@ -111,7 +145,7 @@ func TestBuiltinProperties(t *testing.T) {
 			count++
 		}
 	}
-	if count != len(mayFail) {
+	if count != len(mayFail)+1 {
 		t.Errorf("%d builtins may fail, want %d", count, len(mayFail))
 	}
 	// Allocation does not make a builtin fallible (OOM aborts the request).
@@ -133,7 +167,7 @@ func TestBuiltinProperties(t *testing.T) {
 		t.Error("IsDB false positives")
 	}
 	names := map[BuiltinID]string{
-		BuiltinConsoleLog: "console.log", BuiltinStringStartsWith: "string.startsWith", BuiltinArrayPush: "T[].push",
+		BuiltinConsoleLog: "legacy log", BuiltinConsoleError: "legacy error", BuiltinConsoleDebug: "legacy debug", BuiltinConsoleWarn: "legacy warn", BuiltinConsoleInfo: "legacy info", BuiltinStringStartsWith: "string.startsWith", BuiltinArrayPush: "T[].push",
 		BuiltinCtxHeader: "Context.header", BuiltinDBQuery: "db.query", BuiltinTxExecute: "Transaction.execute",
 		BuiltinConvInt32: "int32", BuiltinDB: "db", BuiltinInt64ToString: "int64.toString",
 	}
@@ -148,10 +182,13 @@ func TestBuiltinProperties(t *testing.T) {
 	if in := BuiltinCtxText.Info(); len(in.Params) != 2 || in.Params[0] != i32 || in.Result != void {
 		t.Error("Context.text signature")
 	}
+	if in := BuiltinEnvGet.Info(); len(in.Params) != 1 || in.Params[0] != str || !IsOptional(in.Result) || !IsString(NonOptional(in.Result)) || !in.Fails {
+		t.Error("env.get signature must be (string) -> string | null and fallible")
+	}
 }
 
 func TestUniverse(t *testing.T) {
-	for _, name := range []string{"int32", "int64", "float64", "bool", "string", "void", "Context", "Error", "Transaction"} {
+	for _, name := range []string{"int32", "int64", "float64", "bool", "string", "void", "Context", "Error", "Transaction", "JsonValue"} {
 		tn, ok := LookupUniverse(name).(*TypeName)
 		if !ok || tn.Name != name || tn.Type.String() != name {
 			t.Errorf("universe type %s = %v", name, LookupUniverse(name))
@@ -168,7 +205,7 @@ func TestUniverse(t *testing.T) {
 			t.Errorf("%s must not be in the universe", name)
 		}
 	}
-	if got := strings.Join(UniverseNames(), " "); got != "Context Error Transaction bool float64 int32 int64 string void" {
+	if got := strings.Join(UniverseNames(), " "); got != "Context Error JsonValue Transaction bool float64 int32 int64 string void" {
 		t.Errorf("UniverseNames = %s", got)
 	}
 	if LookupUniverse("int32").(*TypeName).Type != Typ[Int32] {

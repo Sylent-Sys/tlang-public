@@ -134,6 +134,7 @@ func (g *generator) emitProtos() {
 	for _, f := range g.info.FuncInstances {
 		w.line(g.signature(g.newFuncCtx(f)) + ";")
 	}
+	g.emitEnvGetProto(w)
 	g.emitJSONProtos(w)
 }
 

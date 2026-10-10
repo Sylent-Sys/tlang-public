@@ -68,7 +68,7 @@ let count: int64 = 0;
 fn greet(u: User): string { return u.name; }
 fn main(): void {
 	let u = new User();
-	console.info(greet(u));
+    console.info("greeted", JsonValue.string("ok"));
 }
 `
 	single := mustEmit(t, src)
@@ -110,5 +110,28 @@ fn main(): void { let x: int64 = m.make(); }
 	c := buildGraphC(t, files, "main.ts")
 	if !strings.Contains(c, "tl_f_models_") {
 		t.Fatalf("want a module-tagged make name (tl_f_models_...), got:\n%s", c)
+	}
+}
+
+func TestEnvGetNamespaceLoweringEmitsFallibleOptionalABI(t *testing.T) {
+	c := buildGraphC(t, map[string]string{
+		"main.ts": `
+import * as system from "tlang/system";
+fn main(): void {
+    let value: string | null = system.env.get("API_KEY");
+}
+`,
+	}, "main.ts")
+	for _, want := range []string{
+		"extern tlang_string tlang_env_get(tlang_fiber*, tlang_string);",
+		`tlang_env_get(__fib, TLANG_STR("API_KEY"))`,
+		"if (__fib->err) goto __fail;",
+	} {
+		if !strings.Contains(c, want) {
+			t.Errorf("generated C missing %q:\n%s", want, c)
+		}
+	}
+	if !strings.Contains(c, "tlang_string __t1 = tlang_env_get(__fib, TLANG_STR(\"API_KEY\"));\n    if (__fib->err) goto __fail;") {
+		t.Errorf("env.get must materialize result and check denial immediately:\n%s", c)
 	}
 }

@@ -19,7 +19,7 @@
  *   unless the comment allows it.
  *
  * May fail. A function documented "May fail" reports failure by setting
- *   fib->err = 1 and fib->error = {status, message} and returning the zero
+ *   fib->err = 1 and fib->error = {status, message, category, code} and returning the zero
  *   value of its return type (0, false, NULL, or an empty string). Generated
  *   code tests `if (__fib->err) goto <catch label or failure exit>;` right
  *   after the call. A function documented "Never fails" never touches fib->err.
@@ -108,6 +108,10 @@ typedef struct tlang_string {
     size_t len;
 } tlang_string;
 
+typedef struct tlang_json_value tlang_json_value;
+typedef struct tlang_slice_json_value tlang_slice_json_value;
+typedef struct tlang_opt_json_value { bool has; tlang_json_value* v; } tlang_opt_json_value;
+
 /* String literal as an expression: TLANG_STR("abc") has static lifetime and
  * len 3. The argument must be a string literal (the "" concatenation rejects
  * anything else at compile time). Embedded NULs count: TLANG_STR("a\0b") has
@@ -133,6 +137,8 @@ typedef struct tlang_string {
  * status. `message` must stay valid until the request ends: it is a literal,
  * arena memory, or a slice of the request. Runtime modules copy transient
  * text (libpq messages, for example) into the arena before throwing it.
+ * `category` is one of the stable broad categories below, and `code` is a
+ * stable machine-readable identifier; neither contains provider/errno data.
  * When an error escapes the dispatcher, the HTTP layer answers with `status`
  * if it is in 400..599 and with 500 otherwise, using a generic reason-phrase
  * body; the message goes to stderr, never to the client. Status 499 (client
@@ -140,7 +146,36 @@ typedef struct tlang_string {
 typedef struct tlang_error {
     int32_t status;
     tlang_string message;
+    tlang_string category;
+    tlang_string code;
 } tlang_error;
+
+#define TLANG_ERROR_PERMISSION     "permission"
+#define TLANG_ERROR_INVALID_INPUT  "invalid_input"
+#define TLANG_ERROR_NOT_FOUND      "not_found"
+#define TLANG_ERROR_LIMIT          "limit"
+#define TLANG_ERROR_TIMEOUT        "timeout"
+#define TLANG_ERROR_CANCELLED      "cancelled"
+#define TLANG_ERROR_UNAVAILABLE    "unavailable"
+#define TLANG_ERROR_CONFLICT       "conflict"
+#define TLANG_ERROR_IO             "io"
+#define TLANG_ERROR_DATABASE       "database"
+#define TLANG_ERROR_PROTOCOL       "protocol"
+#define TLANG_ERROR_INTERNAL       "internal"
+
+#define TLANG_ERROR_CODE_INTERNAL              "internal"
+#define TLANG_ERROR_CODE_INVALID_INTEGER       "invalid_integer"
+#define TLANG_ERROR_CODE_INDEX_OUT_OF_RANGE    "index_out_of_range"
+#define TLANG_ERROR_CODE_NULL_VALUE            "null_value"
+#define TLANG_ERROR_CODE_DIVISION_BY_ZERO      "division_by_zero"
+#define TLANG_ERROR_CODE_INVALID_HEADER        "invalid_header"
+#define TLANG_ERROR_CODE_DATABASE_UNAVAILABLE  "database_unavailable"
+#define TLANG_ERROR_CODE_DATABASE_POOL_TIMEOUT "database_pool_timeout"
+#define TLANG_ERROR_CODE_DATABASE_POOL_CANCELLED "database_pool_cancelled"
+#define TLANG_ERROR_CODE_DATABASE_ERROR        "database_error"
+#define TLANG_ERROR_CODE_TX_INACTIVE           "transaction_inactive"
+#define TLANG_ERROR_CODE_DATABASE_VALUE        "invalid_database_value"
+#define TLANG_ERROR_CODE_CLIENT_DISCONNECTED   "client_disconnected"
 
 /* Statuses the runtime itself throws. */
 #define TLANG_STATUS_BAD_REQUEST    400 /* ctx.paramInt, s.toInt */
@@ -258,34 +293,48 @@ struct tlang_fiber {
  * ======================================================================== */
 
 /* `throw new Error(message, status)` and runtime errors: sets fib->err = 1 and
- * fib->error = {status, message}, replacing an error that is already pending
+ * fib->error = {status, message, category, code}, replacing an error pending
  * (codegen never throws over a pending error). A NULL message.data is stored
  * as "". `message` must stay valid until the request ends (see tlang_error).
  * Has no other effect. */
 void tlang_throw(tlang_fiber* fib, int32_t status, tlang_string message);
+void tlang_throw_typed(tlang_fiber* fib, int32_t status, tlang_string message,
+                       tlang_string category, tlang_string code);
 
-/* `throw e;` for a caught Error value: same as tlang_throw(fib, err.status,
- * err.message). */
+/* `throw e;` for a caught Error value: preserves all Error fields. */
 void tlang_throw_value(tlang_fiber* fib, tlang_error err);
 
 /* Entry of a `catch` block: returns the pending error and clears it
- * (fib->err = 0). With no error pending it returns {0, ""}. */
+ * (fib->err = 0). With no error pending it returns zeroed status/empty fields. */
 tlang_error tlang_take_error(tlang_fiber* fib);
+void tlang_throw_fmt_typed(tlang_fiber* fib, int32_t status, tlang_string category,
+                           tlang_string code, const char* fmt, ...);
 
 /* `catch { ... }` without a binding: drops the pending error, if any. */
 static inline void tlang_clear_error(tlang_fiber* fib) {
     fib->err = 0;
     fib->error.status = 0;
     fib->error.message = TLANG_STR("");
+    fib->error.category = TLANG_STR("");
+    fib->error.code = TLANG_STR("");
 }
 
-/* `new Error(message)` (status 500) and `new Error(message, status)`: builds
- * the value without throwing it. Pure. */
-static inline tlang_error tlang_error_make(tlang_string message, int32_t status) {
+/* `new Error(message)` and `new Error(message, status)` default category/code
+ * to internal/internal. This builds the value without throwing it. Pure. */
+static inline tlang_error tlang_error_make_typed(tlang_string message, int32_t status,
+                                                  tlang_string category, tlang_string code) {
     tlang_error e;
     e.status = status;
     e.message = message;
+    e.category = category;
+    e.code = code;
     return e;
+}
+
+static inline tlang_error tlang_error_make(tlang_string message, int32_t status) {
+    return tlang_error_make_typed(message, status,
+                                  TLANG_STR(TLANG_ERROR_INTERNAL),
+                                  TLANG_STR(TLANG_ERROR_CODE_INTERNAL));
 }
 
 /* Throws an error whose message is a string literal. */
@@ -293,17 +342,20 @@ static inline tlang_error tlang_error_make(tlang_string message, int32_t status)
 
 /* Throws Error{500, "null value"}: the `x!` assertion on a null value. */
 static inline void tlang_throw_null(tlang_fiber* fib) {
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NULL_VALUE));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NULL_VALUE),
+                      TLANG_STR(TLANG_ERROR_INTERNAL), TLANG_STR(TLANG_ERROR_CODE_NULL_VALUE));
 }
 
 /* Throws Error{500, "index out of range"}. */
 static inline void tlang_throw_index(tlang_fiber* fib) {
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_INDEX_RANGE));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_INDEX_RANGE),
+                      TLANG_STR(TLANG_ERROR_INVALID_INPUT), TLANG_STR(TLANG_ERROR_CODE_INDEX_OUT_OF_RANGE));
 }
 
 /* Throws Error{500, "division by zero"}. */
 static inline void tlang_throw_div_zero(tlang_fiber* fib) {
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_DIV_ZERO));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_DIV_ZERO),
+                      TLANG_STR(TLANG_ERROR_INVALID_INPUT), TLANG_STR(TLANG_ERROR_CODE_DIVISION_BY_ZERO));
 }
 
 /* ========================================================================
@@ -518,6 +570,7 @@ typedef struct tlang_opt_i32 { bool has; int32_t v; } tlang_opt_i32;
 typedef struct tlang_opt_i64 { bool has; int64_t v; } tlang_opt_i64;
 typedef struct tlang_opt_f64 { bool has; double v; } tlang_opt_f64;
 typedef struct tlang_opt_bool { bool has; bool v; } tlang_opt_bool;
+typedef struct tlang_opt_string { bool has; tlang_string v; } tlang_opt_string;
 
 /* Optional constructors: m is one of i32, i64, f64, bool.
  * TLANG_SOME(i64, x) is a present value, TLANG_NONE(i64) is null. */
@@ -579,6 +632,8 @@ TLANG_SLICE_DEFINE(i64, int64_t)
 TLANG_SLICE_DEFINE(f64, double)
 TLANG_SLICE_DEFINE(bool, bool)
 TLANG_SLICE_DEFINE(str, tlang_string)
+TLANG_SLICE_DEFINE(json_value, tlang_json_value*)
+TLANG_SLICE_DEFINE(opt_JsonValue, tlang_opt_json_value)
 
 _Static_assert(sizeof(tlang_slice_i32) == sizeof(tlang_slice_str) &&
                sizeof(tlang_slice_bool) == sizeof(tlang_slice_f64),
@@ -768,6 +823,44 @@ static inline tlang_value tlang_val_opt_str(tlang_string s) {
 void tlang_console_log(tlang_fiber* fib, const tlang_value* args, int nargs);
 void tlang_console_info(tlang_fiber* fib, const tlang_value* args, int nargs);
 void tlang_console_error(tlang_fiber* fib, const tlang_value* args, int nargs);
+
+/* Structured console calls emit one JSONL record to stdout. fields may be NULL
+ * or a JSON object; message/fields are serialized without changing fib->err.
+ * Records over TLANG_LOG_MAX_RECORD_BYTES are dropped whole with a diagnostic.
+ */
+#define TLANG_LOG_MAX_RECORD_BYTES (1024u * 1024u)
+enum { TLANG_LOG_DEBUG, TLANG_LOG_INFO, TLANG_LOG_WARN, TLANG_LOG_ERROR };
+void tlang_console_json(tlang_fiber* fib, int level, tlang_string message,
+                        const tlang_json_value* fields);
+void tlang_console_json_write_record(int fd, tlang_string record);
+
+/* Opaque generic JSON values. Values and returned slices have request lifetime.
+ * Array/object constructors copy their input arrays; object rejects duplicate
+ * keys and mismatched key/value lengths with Error{400, invalid_input}.
+ */
+enum { TLANG_JSON_NULL, TLANG_JSON_BOOL, TLANG_JSON_NUMBER, TLANG_JSON_STRING,
+       TLANG_JSON_ARRAY, TLANG_JSON_OBJECT };
+tlang_json_value* tlang_json_null(tlang_fiber* fib);
+tlang_json_value* tlang_json_bool(tlang_fiber* fib, bool value);
+tlang_json_value* tlang_json_number(tlang_fiber* fib, double value);
+tlang_json_value* tlang_json_string(tlang_fiber* fib, tlang_string value);
+tlang_json_value* tlang_json_array(tlang_fiber* fib, const tlang_json_value* const* values, int64_t len);
+tlang_json_value* tlang_json_object(tlang_fiber* fib, const tlang_string* keys,
+                                   const tlang_json_value* const* values, int64_t len);
+tlang_string tlang_json_kind(const tlang_json_value* value);
+tlang_opt_bool tlang_json_as_bool(const tlang_json_value* value);
+tlang_opt_f64 tlang_json_as_number(const tlang_json_value* value);
+tlang_opt_string tlang_json_as_string(const tlang_json_value* value);
+tlang_slice_opt_JsonValue* tlang_json_array_values(tlang_fiber* fib, const tlang_json_value* value);
+tlang_slice_str* tlang_json_object_keys(tlang_fiber* fib, const tlang_json_value* value);
+tlang_slice_opt_JsonValue* tlang_json_object_values(tlang_fiber* fib, const tlang_json_value* value);
+tlang_json_value* tlang_json_get(tlang_fiber* fib, const tlang_json_value* value, tlang_string key);
+tlang_string tlang_json_describe(const tlang_json_value* value);
+
+/* Exact-name environment lookup. May fail with 403 permission/env.permission_denied;
+ * authorized unset is TLANG_STR_NULL, and an authorized empty value is "".
+ */
+tlang_string tlang_env_get(tlang_fiber* fib, tlang_string name);
 
 /* ========================================================================
  * 14. JSON (spec §9, DESIGN.md §2.12)
@@ -1263,6 +1356,13 @@ typedef struct tlang_program {
     /* True when the program references `db`: the runtime then creates the
      * per-scheduler pools and requires TLANG_DATABASE_URL (or DATABASE_URL). */
     bool uses_db;
+    /* Non-secret canonical manifest requests and SHA-256 of the exact source
+     * manifest bytes. Empty for programs built without a project manifest. */
+    tlang_string manifest_json;
+    tlang_string manifest_sha256;
+    bool has_manifest;
+    const tlang_string* env_names;
+    size_t env_name_count;
 } tlang_program;
 
 /* The C main of every generated program: `return tlang_main(argc, argv,
@@ -1270,7 +1370,9 @@ typedef struct tlang_program {
  * (DESIGN.md §4.2), ignores SIGPIPE, turns SIGINT/SIGTERM into a graceful
  * stop, then runs the server (TLANG_THREADS schedulers, each with its own
  * SO_REUSEPORT listener, globals and DB pool) or the script. argv is not
- * interpreted in v1. Returns the process exit status: 0 on success (server
+ * interpreted except for the optional `--tlang-grants <path>` runtime grant
+ * file. Manifest programs require a matching versioned grant file. Returns
+ * the process exit status: 0 on success (server
  * stopped by a signal, or script finished), 1 when an error escaped main or
  * startup failed (bind error, global initialiser error, database URL missing),
  * 2 for an invalid configuration or program description. */

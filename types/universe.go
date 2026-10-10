@@ -7,7 +7,7 @@ import "sort"
 var universe = map[string]Object{}
 
 func init() {
-	for _, k := range []BasicKind{Int32, Int64, Float64, Bool, String, Void, Context, Error, Transaction} {
+	for _, k := range []BasicKind{Int32, Int64, Float64, Bool, String, Void, Context, Error, Transaction, JsonValue} {
 		universe[Typ[k].Name] = &TypeName{Name: Typ[k].Name, Type: Typ[k]}
 	}
 }

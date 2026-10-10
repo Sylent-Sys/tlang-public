@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"encoding/json"
+	"strconv"
 	"tlang/ast"
 	"tlang/types"
 )
@@ -87,6 +89,13 @@ func (g *generator) emitInitGlobals() {
 	fc.body.finish()
 
 	w := g.section(secProgram)
+	if names := g.manifestEnvNames(); len(names) > 0 {
+		w.open("static const tlang_string __tl_env_names[" + strconv.Itoa(len(names)) + "] =")
+		for _, name := range names {
+			w.linef("%s,", g.strInit(name))
+		}
+		w.close(";")
+	}
 	w.gap()
 	w.open("static void tl__init_globals(tlang_fiber* __fib, void* __globals)")
 	w.writeBlock(fc.body)
@@ -127,6 +136,17 @@ func (g *generator) emitProgramStruct() {
 	w.linef(".dispatcher   = %s,", dispatcher)
 	w.linef(".main         = %s,", main)
 	w.linef(".uses_db      = %s,", usesDB)
+	if names := g.manifestEnvNames(); len(names) > 0 {
+		w.line(".env_names = __tl_env_names,")
+		w.linef(".env_name_count = %d,", len(names))
+	}
+	if g.info.ManifestSHA256 != "" {
+		w.linef(".manifest_json = %s,", g.strInit(g.info.ManifestJSON))
+		w.linef(".manifest_sha256 = %s,", g.strInit(g.info.ManifestSHA256))
+		w.line(".has_manifest = true,")
+	} else {
+		w.line(".has_manifest = false,")
+	}
 	w.close(";")
 	w.line("int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); }")
 }
@@ -135,6 +155,16 @@ func (g *generator) emitProgramStruct() {
 // interface instance created after type collection has no struct body in
 // region A, which would be broken C, so it is reported as an internal error
 // instead (codegen design §3.1 step 2).
+func (g *generator) manifestEnvNames() []string {
+	var manifest struct {
+		Capabilities struct {
+			Env []string `json:"env"`
+		} `json:"capabilities"`
+	}
+	_ = json.Unmarshal([]byte(g.info.ManifestJSON), &manifest)
+	return manifest.Capabilities.Env
+}
+
 func (g *generator) checkInstanceGuard() {
 	all := g.info.Instances.NamedInstances()
 	if len(all) == g.instCount {

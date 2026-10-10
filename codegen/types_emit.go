@@ -26,7 +26,7 @@ func (g *generator) collectTypes() {
 	g.slices = g.info.SliceTypes()
 	g.sliceSet = make(map[string]bool, len(g.slices))
 	for _, a := range g.slices {
-		g.sliceSet[g.mangle(a.Elem)] = true
+		g.sliceSet[types.SliceCName(a.Elem)] = true
 	}
 
 	// 2. Seed the struct list with the declared interfaces (already in the

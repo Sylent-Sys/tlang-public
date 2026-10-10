@@ -10,8 +10,9 @@ import (
 
 // typecheck.go is the body typechecker (DESIGN.md pass 3): the statement and
 // expression walker that records Info.Types/Uses/Defs(locals)/Selections/
-// Calls/Conversions/Narrowed and seeds Info.Routes/DBTypes/UsesDB and the
-// generic worklist. It drives the types-package predicates and folders
+// Calls/Conversions/Narrowed and seeds Info.Routes/DBTypes, JSON demands and
+// the generic worklist. Entry-rooted runtime features are computed later. It
+// drives the types-package predicates and folders
 // rather than re-deriving any rule, recovers with Typ[Invalid] so one error
 // does not cascade, and never panics on a parser-produced tree.
 
@@ -393,7 +394,6 @@ func (c *checker) checkTransaction(sc *scope, s *ast.TransactionStatement, facts
 		c.info.Defs[s.Param] = v
 		c.declare(body, s.Param.Name, types.DeclValue, v, s.Param.NamePos)
 	}
-	c.info.UsesDB = true
 	save := c.inTx
 	c.inTx = true
 	if s.Body != nil {

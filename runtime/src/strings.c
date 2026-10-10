@@ -162,7 +162,9 @@ tlang_string tlang_str_clone_global(tlang_fiber* fib, tlang_string s) {
 int64_t tlang_str_to_int(tlang_fiber* fib, tlang_string s) {
     int64_t v;
     if (!tlang_parse_i64(s.data, s.len, &v)) {
-        tlang_throw(fib, TLANG_STATUS_BAD_REQUEST, TLANG_STR(TLANG_MSG_INVALID_INT));
+        tlang_throw_typed(fib, TLANG_STATUS_BAD_REQUEST, TLANG_STR(TLANG_MSG_INVALID_INT),
+                          TLANG_STR(TLANG_ERROR_INVALID_INPUT),
+                          TLANG_STR(TLANG_ERROR_CODE_INVALID_INTEGER));
         return 0;
     }
     return v;

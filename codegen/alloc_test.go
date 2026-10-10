@@ -23,8 +23,8 @@ fn f(): void {
 	for _, want := range []string{
 		"l_c = (tl_C*)tlang_alloc_zeroed(__fib, sizeof(tl_C));",
 		"l_cs = TLANG_SLICE_NEW(__fib, C);",
-		`l_e = tlang_error_make(TLANG_STR("m"), 500);`,
-		`l_e2 = tlang_error_make(TLANG_STR("m"), 404);`,
+		`l_e = tlang_error_make_typed(TLANG_STR("m"), 500, TLANG_STR("internal"), TLANG_STR("internal"));`,
+		`l_e2 = tlang_error_make_typed(TLANG_STR("m"), 404, TLANG_STR("internal"), TLANG_STR("internal"));`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
@@ -194,6 +194,8 @@ func TestErrorMemberStore(t *testing.T) {
 fn f(e: Error): void {
     e.status = 404;
     e.message += "!";
+    e.category = "not_found";
+    e.code = "resource_missing";
     mkErr().message = "discarded";
     mkErr().status += 1;
 }
@@ -201,6 +203,8 @@ fn f(e: Error): void {
 	for _, want := range []string{
 		"l_e.status = 404;",
 		"l_e.message = tlang_str_concat(__fib, l_e.message, TLANG_STR(\"!\"));",
+		"l_e.category = TLANG_STR(\"not_found\");",
+		"l_e.code = TLANG_STR(\"resource_missing\");",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)

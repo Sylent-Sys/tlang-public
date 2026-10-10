@@ -30,7 +30,8 @@
 int64_t tlang_db_execute(tlang_fiber* fib, tlang_tx* tx, tlang_string sql,
                          const tlang_pg_param* params, int nparams) {
     (void)tx; (void)sql; (void)params; (void)nparams;
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB),
+                      TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
     return 0;
 }
 
@@ -38,7 +39,8 @@ void* tlang_db_query(tlang_fiber* fib, tlang_tx* tx, tlang_string sql,
                      const tlang_pg_param* params, int nparams,
                      const tlang_type_desc* desc) {
     (void)tx; (void)sql; (void)params; (void)nparams; (void)desc;
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB),
+                      TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
     return NULL;
 }
 
@@ -46,7 +48,8 @@ void* tlang_db_query_one(tlang_fiber* fib, tlang_tx* tx, tlang_string sql,
                          const tlang_pg_param* params, int nparams,
                          const tlang_type_desc* desc) {
     (void)tx; (void)sql; (void)params; (void)nparams; (void)desc;
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB),
+                      TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
     return NULL;
 }
 
@@ -55,13 +58,15 @@ bool tlang_tx_begin(tlang_fiber* fib, tlang_tx* tx) {
         tx->conn = NULL;
         tx->state = TLANG_TX_NONE;
     }
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB),
+                      TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
     return false;
 }
 
 bool tlang_tx_commit(tlang_fiber* fib, tlang_tx* tx) {
     (void)tx;
-    tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB));
+    tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB),
+                      TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
     return false;
 }
 
@@ -523,8 +528,8 @@ static tlang_pg_conn* pg_pool_take(Fiber* f, struct tlang_pg_pool* pool) {
          * every path, so an in-flight or failed open never leaks. */
         c = (tlang_pg_conn*)calloc(1, sizeof *c);
         if (c == NULL) {
-            tlang_throw(&f->pub, TLANG_STATUS_UNAVAILABLE,
-                        TLANG_STR(TLANG_MSG_DB_UNAVAILABLE));
+            tlang_throw_typed(&f->pub, TLANG_STATUS_UNAVAILABLE, TLANG_STR(TLANG_MSG_DB_UNAVAILABLE),
+                             TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
             return NULL;
         }
         c->sched = pool->sched;
@@ -541,8 +546,8 @@ static tlang_pg_conn* pg_pool_take(Fiber* f, struct tlang_pg_pool* pool) {
             pool->created--;
             pg_conn_close(c);
             free(c);
-            tlang_throw(&f->pub, TLANG_STATUS_UNAVAILABLE,
-                        TLANG_STR(TLANG_MSG_DB_UNAVAILABLE));
+            tlang_throw_typed(&f->pub, TLANG_STATUS_UNAVAILABLE, TLANG_STR(TLANG_MSG_DB_UNAVAILABLE),
+                             TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
             return NULL;
         }
     } else {
@@ -552,13 +557,13 @@ static tlang_pg_conn* pg_pool_take(Fiber* f, struct tlang_pg_pool* pool) {
         if (r == TLANG_WAIT_OK) {
             c = (tlang_pg_conn*)v;
         } else if (r == TLANG_WAIT_TIMEOUT) {
-            tlang_throw(&f->pub, TLANG_STATUS_UNAVAILABLE,
-                        TLANG_STR(TLANG_MSG_POOL_TIMEOUT));
+            tlang_throw_typed(&f->pub, TLANG_STATUS_UNAVAILABLE, TLANG_STR(TLANG_MSG_POOL_TIMEOUT),
+                             TLANG_STR(TLANG_ERROR_TIMEOUT), TLANG_STR(TLANG_ERROR_CODE_DATABASE_POOL_TIMEOUT));
             return NULL;
         } else {
             /* Cancelled by shutdown. */
-            tlang_throw(&f->pub, TLANG_STATUS_UNAVAILABLE,
-                        TLANG_STR(TLANG_MSG_POOL_TIMEOUT));
+            tlang_throw_typed(&f->pub, TLANG_STATUS_UNAVAILABLE, TLANG_STR(TLANG_MSG_POOL_TIMEOUT),
+                             TLANG_STR(TLANG_ERROR_CANCELLED), TLANG_STR(TLANG_ERROR_CODE_DATABASE_POOL_CANCELLED));
             return NULL;
         }
     }
@@ -567,8 +572,8 @@ static tlang_pg_conn* pg_pool_take(Fiber* f, struct tlang_pg_pool* pool) {
     if (c->pg == NULL || c->broken || PQstatus(c->pg) != CONNECTION_OK) {
         pg_conn_reset_or_close(f, pool, &c, deadline);
         if (c == NULL) {
-            tlang_throw(&f->pub, TLANG_STATUS_UNAVAILABLE,
-                        TLANG_STR(TLANG_MSG_DB_UNAVAILABLE));
+            tlang_throw_typed(&f->pub, TLANG_STATUS_UNAVAILABLE, TLANG_STR(TLANG_MSG_DB_UNAVAILABLE),
+                             TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
             return NULL;
         }
     }
@@ -710,7 +715,7 @@ static PGresult* pg_exec_on(Fiber* f, tlang_pg_conn* c, tlang_string sql,
             if (PQsendQueryParams(c->pg, sql.data, nparams, NULL, values,
                                   NULL, NULL, 0) == 0) {
                 c->broken = true;
-                tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "%s", PQerrorMessage(c->pg));
+                tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR), "%s", PQerrorMessage(c->pg));
                 return NULL;
             }
             res = pg_run(f, c, deadline, &peer_gone, &io_err);
@@ -718,7 +723,7 @@ static PGresult* pg_exec_on(Fiber* f, tlang_pg_conn* c, tlang_string sql,
         }
         if (PQsendPrepare(c->pg, st->name, st->sql, nparams, NULL) == 0) {
             c->broken = true;
-            tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "%s", PQerrorMessage(c->pg));
+            tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR), "%s", PQerrorMessage(c->pg));
             return NULL;
         }
         res = pg_run(f, c, deadline, &peer_gone, &io_err);
@@ -728,7 +733,7 @@ static PGresult* pg_exec_on(Fiber* f, tlang_pg_conn* c, tlang_string sql,
                                       strlen(PQresultErrorMessage(res)));
             PQclear(res);
             c->broken = true;
-            tlang_throw(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg));
+            tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR));
             return NULL;
         }
         PQclear(res);
@@ -736,7 +741,7 @@ static PGresult* pg_exec_on(Fiber* f, tlang_pg_conn* c, tlang_string sql,
 
     if (PQsendQueryPrepared(c->pg, st->name, nparams, values, NULL, NULL, 0) == 0) {
         c->broken = true;
-        tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "%s", PQerrorMessage(c->pg));
+        tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR), "%s", PQerrorMessage(c->pg));
         return NULL;
     }
     res = pg_run(f, c, deadline, &peer_gone, &io_err);
@@ -751,7 +756,7 @@ finish:
             char* msg = pg_arena_cstr(fib, m, strlen(m));
             PQclear(res);
             c->broken = true;
-            tlang_throw(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg));
+            tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR));
             return NULL;
         }
     }
@@ -759,10 +764,9 @@ finish:
 
 run_failed:
     if (peer_gone)
-        tlang_throw(fib, TLANG_STATUS_CLIENT_CLOSED, TLANG_STR(TLANG_MSG_CLIENT_GONE));
+        tlang_throw_typed(fib, TLANG_STATUS_CLIENT_CLOSED, TLANG_STR(TLANG_MSG_CLIENT_GONE), TLANG_STR(TLANG_ERROR_CANCELLED), TLANG_STR(TLANG_ERROR_CODE_CLIENT_DISCONNECTED));
     else
-        tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "%s",
-                        c->pg != NULL ? PQerrorMessage(c->pg) : "database error");
+        tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR), "%s", c->pg != NULL ? PQerrorMessage(c->pg) : "database error");
     return NULL;
 }
 
@@ -794,8 +798,7 @@ static bool pg_map_cell(tlang_fiber* fib, void* row, const tlang_field_desc* fd,
 
     if (is_null) {
         if (!optional) {
-            tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL,
-                            "null value for non-optional field");
+            tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_VALUE), "null value for non-optional field");
             return false;
         }
         /* Store the null variant. */
@@ -814,7 +817,7 @@ static bool pg_map_cell(tlang_fiber* fib, void* row, const tlang_field_desc* fd,
     case TLANG_KIND_I32: {
         int64_t v;
         if (!tlang_parse_i64(text, (size_t)len, &v) || v < INT32_MIN || v > INT32_MAX) {
-            tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "invalid int32 value in result");
+            tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_VALUE), "invalid int32 value in result");
             return false;
         }
         if (optional) { tlang_opt_i32 o = TLANG_SOME(i32, (int32_t)v); memcpy(dst, &o, sizeof o); }
@@ -824,7 +827,7 @@ static bool pg_map_cell(tlang_fiber* fib, void* row, const tlang_field_desc* fd,
     case TLANG_KIND_I64: {
         int64_t v;
         if (!tlang_parse_i64(text, (size_t)len, &v)) {
-            tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "invalid int64 value in result");
+            tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_VALUE), "invalid int64 value in result");
             return false;
         }
         if (optional) { tlang_opt_i64 o = TLANG_SOME(i64, v); memcpy(dst, &o, sizeof o); }
@@ -836,7 +839,7 @@ static bool pg_map_cell(tlang_fiber* fib, void* row, const tlang_field_desc* fd,
         char* endp = NULL;
         double v = strtod(buf, &endp);
         if (endp == buf || *endp != '\0') {
-            tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "invalid float64 value in result");
+            tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_VALUE), "invalid float64 value in result");
             return false;
         }
         if (optional) { tlang_opt_f64 o = TLANG_SOME(f64, v); memcpy(dst, &o, sizeof o); }
@@ -847,7 +850,7 @@ static bool pg_map_cell(tlang_fiber* fib, void* row, const tlang_field_desc* fd,
         bool v;
         if (len == 1 && (text[0] == 't' || text[0] == 'f')) v = (text[0] == 't');
         else {
-            tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "invalid bool value in result");
+            tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_VALUE), "invalid bool value in result");
             return false;
         }
         if (optional) { tlang_opt_bool o = TLANG_SOME(bool, v); memcpy(dst, &o, sizeof o); }
@@ -900,8 +903,7 @@ static void* pg_map_row(tlang_fiber* fib, PGresult* res, int row,
     for (i = 0; i < desc->nfields; i++) {
         if (seen[i]) continue;
         if ((desc->fields[i].kind & TLANG_KIND_OPT) == 0 && desc->new_row == NULL) {
-            tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL,
-                            "no column for non-optional field");
+            tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_VALUE), "no column for non-optional field");
             return NULL;
         }
     }
@@ -929,12 +931,12 @@ static tlang_pg_conn* pg_resolve_conn(Fiber* f, tlang_tx* tx, bool* autocommit) 
 
     if (pool == NULL) {
         /* uses_db was false but a db call was made: unavailable. */
-        tlang_throw(&f->pub, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB));
+        tlang_throw_typed(&f->pub, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
         return NULL;
     }
     if (tx != NULL) {
         if (tx->state != TLANG_TX_ACTIVE || tx->conn == NULL) {
-            tlang_throw(&f->pub, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_TX_INACTIVE));
+            tlang_throw_typed(&f->pub, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_TX_INACTIVE), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_TX_INACTIVE));
             return NULL;
         }
         return tx->conn;
@@ -1042,7 +1044,7 @@ bool tlang_tx_begin(tlang_fiber* fib, tlang_tx* tx) {
     tx->state = TLANG_TX_NONE;
 
     if (pool == NULL) {
-        tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB));
+        tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_NO_DB), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
         return false;
     }
 
@@ -1051,7 +1053,7 @@ bool tlang_tx_begin(tlang_fiber* fib, tlang_tx* tx) {
 
     if (PQsendQuery(c->pg, "BEGIN") == 0) {
         c->broken = true;
-        tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "%s", PQerrorMessage(c->pg));
+        tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR), "%s", PQerrorMessage(c->pg));
         pg_release(f, pool, c);
         return false;
     }
@@ -1061,11 +1063,11 @@ bool tlang_tx_begin(tlang_fiber* fib, tlang_tx* tx) {
             const char* m = PQresultErrorMessage(res);
             char* msg = pg_arena_cstr(fib, m, strlen(m));
             PQclear(res);
-            tlang_throw(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg));
+            tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR));
         } else if (peer_gone) {
-            tlang_throw(fib, TLANG_STATUS_CLIENT_CLOSED, TLANG_STR(TLANG_MSG_CLIENT_GONE));
+            tlang_throw_typed(fib, TLANG_STATUS_CLIENT_CLOSED, TLANG_STR(TLANG_MSG_CLIENT_GONE), TLANG_STR(TLANG_ERROR_CANCELLED), TLANG_STR(TLANG_ERROR_CODE_CLIENT_DISCONNECTED));
         } else {
-            tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_DB_UNAVAILABLE));
+            tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_DB_UNAVAILABLE), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
         }
         c->broken = true;
         pg_release(f, pool, c);
@@ -1086,14 +1088,14 @@ bool tlang_tx_commit(tlang_fiber* fib, tlang_tx* tx) {
     bool peer_gone = false, io_err = false;
 
     if (tx == NULL || tx->state != TLANG_TX_ACTIVE || tx->conn == NULL) {
-        tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_TX_INACTIVE));
+        tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_TX_INACTIVE), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_TX_INACTIVE));
         return false;
     }
     c = tx->conn;
 
     if (PQsendQuery(c->pg, "COMMIT") == 0) {
         c->broken = true;
-        tlang_throw_fmt(fib, TLANG_STATUS_INTERNAL, "%s", PQerrorMessage(c->pg));
+        tlang_throw_fmt_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR), "%s", PQerrorMessage(c->pg));
         return false;   /* connection still held: codegen jumps to rollback */
     }
     res = pg_run(f, c, pg_deadline(60000), &peer_gone, &io_err);
@@ -1102,11 +1104,11 @@ bool tlang_tx_commit(tlang_fiber* fib, tlang_tx* tx) {
             const char* m = PQresultErrorMessage(res);
             char* msg = pg_arena_cstr(fib, m, strlen(m));
             PQclear(res);
-            tlang_throw(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg));
+            tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, tlang_str_cstr(msg), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR));
         } else if (peer_gone) {
-            tlang_throw(fib, TLANG_STATUS_CLIENT_CLOSED, TLANG_STR(TLANG_MSG_CLIENT_GONE));
+            tlang_throw_typed(fib, TLANG_STATUS_CLIENT_CLOSED, TLANG_STR(TLANG_MSG_CLIENT_GONE), TLANG_STR(TLANG_ERROR_CANCELLED), TLANG_STR(TLANG_ERROR_CODE_CLIENT_DISCONNECTED));
         } else {
-            tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_DB_UNAVAILABLE));
+            tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_DB_UNAVAILABLE), TLANG_STR(TLANG_ERROR_DATABASE), TLANG_STR(TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
         }
         c->broken = true;
         return false;   /* connection still held */

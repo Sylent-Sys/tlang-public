@@ -77,10 +77,10 @@ func TestThrowForms(t *testing.T) {
     throw "x" + s;
 }
 `)
-	if !strings.Contains(out, `tlang_throw(__fib, 500, TLANG_STR("plain"));`) {
+	if !strings.Contains(out, `tlang_throw_typed(__fib, 500, TLANG_STR("plain"), TLANG_STR("internal"), TLANG_STR("internal"));`) {
 		t.Error("missing string throw")
 	}
-	if !strings.Contains(out, `tlang_throw(__fib, 418, TLANG_STR("one"));`) {
+	if !strings.Contains(out, `tlang_throw_typed(__fib, 418, TLANG_STR("one"), TLANG_STR("internal"), TLANG_STR("internal"));`) {
 		t.Error("missing new Error throw")
 	}
 	if !strings.Contains(out, "tlang_throw_value(__fib, l_e);") {
@@ -103,7 +103,7 @@ fn f(n: int64): void {
             tx.execute("UPDATE a SET x = $1", n);
         });
     } catch (e) {
-        console.error(e.message);
+                console.error(e.message, JsonValue.string(e.message));
     }
 }
 `)

@@ -13,13 +13,16 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: tlang check <file.ts>")
 		return exitUsage
 	}
-	path := args[0]
+	path, projectRoot, discovered, ok := resolveProjectInputWithManifest(args[0], stderr)
+	if !ok {
+		return exitUsage
+	}
 
 	if _, ok := loadSource(path, stderr); !ok {
 		return exitUsage
 	}
 
-	res := runFrontendGraph(path, stderr)
+	res := runFrontendGraph(path, projectRoot, discovered, stderr)
 	if res.hasErrs {
 		return exitFail
 	}

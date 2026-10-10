@@ -21,8 +21,7 @@ import (
 //     (the C break of a may-fail loop condition has no source node and always
 //     exits its own generated loop);
 //   - item 5: db.transaction called with a non-arrow argument;
-//   - item 6: a store to a builtin field-like member other than Error.message
-//     and Error.status;
+//   - item 6: a store to a builtin field-like member other than Error fields;
 //   - item 7: two parameters (receiver included) with one name, or a
 //     parameter or receiver name containing "__";
 //   - item 8: two file-scope C names that collide, or one that generated code
@@ -147,7 +146,8 @@ func (v *validator) checkStore(a *ast.AssignmentExpression) {
 		return
 	}
 	switch sel.Builtin {
-	case types.BuiltinErrorMessage, types.BuiltinErrorStatus:
+	case types.BuiltinErrorMessage, types.BuiltinErrorStatus,
+		types.BuiltinErrorCategory, types.BuiltinErrorCode:
 		return
 	}
 	v.g.fail(errBuiltinStore(m.Pos(), sel.Builtin))

@@ -324,9 +324,19 @@ type Info struct {
 	// Entry is route_dispatcher (server) or main (script).
 	Entry *Func
 
-	// UsesDB reports any use of db (a db or tx call, or a transaction
-	// statement): codegen sets .uses_db and the driver links libpq
-	// (otherwise it compiles the runtime with -DTLANG_NO_PG).
+	// Features is the deterministic feature summary of code reachable from
+	// Entry and global initializers, including reachable guards and after hooks.
+	Features ProgramFeatures
+
+	// ManifestJSON and ManifestSHA256 carry non-secret project authority
+	// requests into generated static runtime metadata. ManifestJSON is the exact
+	// validated source document; grants are deliberately never stored here.
+	ManifestJSON   string
+	ManifestSHA256 string
+
+	// UsesDB reports whether reachable program code uses the database runtime;
+	// it is a projection of Features.RuntimeAPIs for compatibility with the
+	// current code generator and driver.
 	UsesDB bool
 
 	// Instances is the instantiation cache used by the checker. Codegen

@@ -224,6 +224,7 @@ func (c *checker) run(prog *ast.Program) {
 	c.analyzeEscape()   // pass 4 (FEAT-003)
 	c.markMayFail()     // pass 5 (FEAT-003)
 	c.selectEntry(prog) // pass 6 (FEAT-003)
+	c.analyzeProgramFeatures()
 	// After selectEntry has assembled the concrete output lists, reject any
 	// two file-scope C names that collide (DESIGN.md §3.2, codegen §12 item
 	// 8): the authoritative check now lives here, with codegen's nameTable as

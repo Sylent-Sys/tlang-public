@@ -1,14 +1,20 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 
 	"tlang/ast"
 	"tlang/checker"
+	"tlang/diag"
 	"tlang/module"
 	"tlang/parser"
+	"tlang/project"
 	"tlang/types"
 )
 
@@ -17,6 +23,7 @@ import (
 type frontendResult struct {
 	prog    *ast.Program
 	info    *types.Info
+	project *project.Project
 	src     []byte
 	hasErrs bool
 }
@@ -31,6 +38,58 @@ func loadSource(path string, stderr io.Writer) (src []byte, ok bool) {
 		return nil, false
 	}
 	return src, true
+}
+
+// resolveProjectInput keeps ordinary file invocations on their legacy path,
+// but when an ancestor tlang.json exists it makes the manifest entry the
+// project's single CLI entry: a directory selects that entry, while a file
+// must name it explicitly. Discovery errors are safe to display (project
+// errors intentionally omit manifest contents and paths).
+func resolveProjectInput(input string, stderr io.Writer) (sourcePath, rootDir string, ok bool) {
+	sourcePath, rootDir, _, ok = resolveProjectInputWithManifest(input, stderr)
+	return sourcePath, rootDir, ok
+}
+
+func resolveProjectInputWithManifest(input string, stderr io.Writer) (sourcePath, rootDir string, discovered *project.Project, ok bool) {
+	projectInfo, err := project.Discover(input)
+	if errors.Is(err, project.ErrManifestNotFound) {
+		return input, "", nil, true
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "tlang: %v\n", err)
+		return "", "", nil, false
+	}
+
+	info, statErr := os.Stat(input)
+	if statErr == nil && info.IsDir() {
+		return projectInfo.EntryPath(), projectInfo.Root, projectInfo, true
+	}
+	inputAbs, inputErr := filepath.Abs(input)
+	entryAbs, entryErr := filepath.Abs(projectInfo.EntryPath())
+	if inputErr != nil || entryErr != nil || !samePath(inputAbs, entryAbs) {
+		fmt.Fprintln(stderr, "tlang: project: input does not match manifest entry")
+		return "", "", nil, false
+	}
+	return input, projectInfo.Root, projectInfo, true
+}
+
+func readProjectManifest(discovered *project.Project) []byte {
+	if discovered == nil {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(discovered.Root, project.ManifestName))
+	if err != nil || project.ManifestDigest(data) != discovered.ManifestSHA256 {
+		return nil
+	}
+	return data
+}
+
+func samePath(a, b string) bool {
+	a, b = filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
 }
 
 // runFrontend parses and type-checks src, rendering every diagnostic from
@@ -69,8 +128,15 @@ func runFrontend(path string, src []byte, stderr io.Writer) frontendResult {
 // A single import-free root collapses to one module whose Statements are its
 // own declarations with every tag "", so the emitted C is byte-identical to
 // the single-file path.
-func runFrontendGraph(rootPath string, stderr io.Writer) frontendResult {
-	graph, buildDiags := module.Build(rootPath)
+func runFrontendGraph(rootPath, projectRoot string, discovered *project.Project, stderr io.Writer) frontendResult {
+	var graph *module.Graph
+	var buildDiags *diag.List
+	if projectRoot == "" {
+		// A zero root preserves the exact pre-manifest module graph behavior.
+		graph, buildDiags = module.Build(rootPath)
+	} else {
+		graph, buildDiags = module.BuildWith(rootPath, module.BuildOptions{RootDir: projectRoot})
+	}
 	if buildDiags.Len() > 0 {
 		fmt.Fprint(stderr, buildDiags.Render(nil))
 	}
@@ -79,6 +145,15 @@ func runFrontendGraph(rootPath string, stderr io.Writer) frontendResult {
 	}
 
 	info, checkDiags := checker.CheckProgram(graph.Modules)
+	if discovered != nil {
+		manifestBytes := readProjectManifest(discovered)
+		if manifestBytes == nil {
+			fmt.Fprintln(stderr, "tlang: project manifest changed during compilation")
+			return frontendResult{hasErrs: true}
+		}
+		info.ManifestJSON = string(manifestBytes)
+		info.ManifestSHA256 = discovered.ManifestSHA256
+	}
 	if checkDiags.Len() > 0 {
 		fmt.Fprint(stderr, checkDiags.Render(nil))
 	}
@@ -87,6 +162,7 @@ func runFrontendGraph(rootPath string, stderr io.Writer) frontendResult {
 	return frontendResult{
 		prog:    merged,
 		info:    info,
+		project: discovered,
 		hasErrs: checkDiags.HasErrors(),
 	}
 }

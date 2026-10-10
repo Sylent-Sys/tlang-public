@@ -388,12 +388,27 @@ func TestNewErrorArrayAllowed(t *testing.T) {
 }
 
 func TestNewError(t *testing.T) {
-	src := wrap("let e = new Error(\"boom\", 404);")
+	src := wrap("let e = new Error(\"boom\", 404); e.category = \"not_found\"; e.code = \"resource_missing\";")
 	info, diags := check(t, src)
 	wantCodes(t, diags)
 	v := localByName(t, info, "e")
 	if !types.IsBasic(v.Type, types.Error) {
 		t.Fatalf("e = %s, want Error", v.Type)
+	}
+}
+
+func TestErrorCategoryAndCodeTypes(t *testing.T) {
+	for _, src := range []string{
+		`let e = new Error("bad"); let c: string = e.category; let d: string = e.code;`,
+		`let e = new Error("bad"); e.category = 1;`,
+		`let e = new Error("bad"); e.code = 1;`,
+	} {
+		_, diags := check(t, wrap(src))
+		if strings.Contains(src, "= 1") {
+			wantCodes(t, diags, "E-TYPE")
+		} else {
+			wantCodes(t, diags)
+		}
 	}
 }
 

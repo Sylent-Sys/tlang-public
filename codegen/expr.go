@@ -1000,6 +1000,12 @@ func (fc *funcCtx) builtinMember(e *ast.MemberExpression, sel *types.Selection) 
 	case types.BuiltinErrorStatus:
 		recv := fc.memberRecv(e.Object)
 		return opVal(recv.operand()+".status", recv.stable).atomize()
+	case types.BuiltinErrorCategory:
+		recv := fc.memberRecv(e.Object)
+		return opVal(recv.operand()+".category", recv.stable).atomize()
+	case types.BuiltinErrorCode:
+		recv := fc.memberRecv(e.Object)
+		return opVal(recv.operand()+".code", recv.stable).atomize()
 	case types.BuiltinCtxMethod:
 		return fc.ctxField(e.Object, "method")
 	case types.BuiltinCtxPath:
@@ -1008,6 +1014,18 @@ func (fc *funcCtx) builtinMember(e *ast.MemberExpression, sel *types.Selection) 
 		return fc.ctxField(e.Object, "body")
 	case types.BuiltinCtxRawQuery:
 		return fc.ctxField(e.Object, "query")
+	case types.BuiltinJsonKind:
+		recv := fc.memberRecv(e.Object)
+		return atom("tlang_json_describe(" + recv.code + ")")
+	case types.BuiltinJsonAsBool:
+		recv := fc.memberRecv(e.Object)
+		return atom("tlang_json_as_bool(" + recv.code + ")")
+	case types.BuiltinJsonAsNumber:
+		recv := fc.memberRecv(e.Object)
+		return atom("tlang_json_as_number(" + recv.code + ")")
+	case types.BuiltinJsonAsString:
+		recv := fc.memberRecv(e.Object)
+		return atom("tlang_json_as_string(" + recv.code + ")")
 	}
 	fc.g.fail(notImplemented(e.Pos(), "builtin member "+sel.Builtin.String()))
 	return cval{}
@@ -1100,18 +1118,21 @@ func (fc *funcCtx) sliceNew(elem types.Type, global bool) string {
 }
 
 // newError lowers new Error(m[, s]) / new global Error(...) (codegen design
-// §8.9): tlang_error_make(message, status), status defaulting to 500. The
+// §8.9): tlang_error_make_typed(message, status, category, code), defaults to
+// 500/internal/internal. The
 // Global flag has no effect: Error is a by-value tlang_error.
 func (fc *funcCtx) newError(e *ast.NewExpression) cval {
 	msg := atom(`TLANG_STR("")`)
 	status := "500"
+	category := `TLANG_STR("internal")`
+	code := `TLANG_STR("internal")`
 	if len(e.Args) >= 1 {
 		msg = fc.value(e.Args[0])
 	}
 	if len(e.Args) >= 2 {
 		status = fc.value(e.Args[1]).code
 	}
-	return opVal("tlang_error_make("+msg.code+", "+status+")", msg.stable).atomize()
+	return opVal("tlang_error_make_typed("+msg.code+", "+status+", "+category+", "+code+")", msg.stable).atomize()
 }
 
 // newObject lowers new T() / new global T() (codegen design §8.9, plan D23).

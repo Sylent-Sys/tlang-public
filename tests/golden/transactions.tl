@@ -18,7 +18,7 @@ fn txs(n: int64): void {
             }
         });
     } catch (e) {
-        console.error(e.message);
+        console.error(e.message, JsonValue.string(e.message));
     }
     let i: int64 = 0;
     while (i < n) {

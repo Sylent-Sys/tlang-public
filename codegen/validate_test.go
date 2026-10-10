@@ -359,6 +359,8 @@ fn main(): void {
     let u = new User();
     u.id = 2;
     u.err.status = 404;
+    u.err.category = "not_found";
+    u.err.code = "resource_missing";
     try {
         throw "x";
     } catch (e) {
@@ -367,6 +369,8 @@ fn main(): void {
         e.message += "z";
         e.status++;
         e.status += int32(2);
+        e.category = "internal";
+        e.code = "custom_failure";
     }
 }`},
 		{"single underscores in parameter names", `fn f(a_2: int64, _b: int64, c_: int64): void {

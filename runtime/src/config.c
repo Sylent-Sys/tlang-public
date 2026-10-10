@@ -118,8 +118,8 @@ int tlang_config_load(tlang_config* cfg, char* err, size_t errlen) {
         cfg->stack_size = (cfg->stack_size + page - 1) / page * page;
     }
 
-    /* The database URL: TLANG_DATABASE_URL, else DATABASE_URL, else NULL.
-     * Never echoed in any error message. */
+    /* Legacy non-manifest programs may still use the environment. Manifest
+     * programs replace this with the URL in the validated grant document. */
     cfg->database_url = tl_env("TLANG_DATABASE_URL");
     if (cfg->database_url == NULL) cfg->database_url = tl_env("DATABASE_URL");
 

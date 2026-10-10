@@ -2,7 +2,10 @@
 
 This document turns the TLang Technical Specification 1.2.1 (`TLang_Technical_Specification_1.2.1.md`, "the spec") into decisions an implementation can follow. Where the spec is silent or lists an open decision (Appendix B), this document picks one option and says why. Section references like §6.3 point into the spec.
 
-Status of every decision here: implemented in v1 unless marked *(deferred)*.
+Status of every decision here: implemented in v1 unless marked *(deferred)*,
+except for the approved but partially implemented Phase 2 contracts in
+`docs/DESIGN-modules.md` §12.6. Those contracts are not all implemented runtime
+behavior.
 
 ---
 
@@ -185,7 +188,7 @@ Members: `s.len` (int64), `s.eq(t)`, `s.slice(a, b)` (like JavaScript `String.pr
 
 ### 2.8 Errors (§3.6)
 
-* Builtin value type `Error` with fields `message: string` and `status: int32` (suggested HTTP status).
+* Builtin value type `Error` retains `message: string` and `status: int32` (suggested HTTP status) and appends mutable `category: string` and `code: string` fields. Stable categories are `permission`, `invalid_input`, `not_found`, `limit`, `timeout`, `cancelled`, `unavailable`, `conflict`, `io`, `database`, `protocol`, and `internal`; a new Error defaults to `internal` / `internal`. Codes are stable machine-readable identifiers, not errno or provider values. The language model, generated C ABI, and runtime throw/catch path implement these fields; this does not imply that every proposed capability API is implemented.
 * `throw new Error("msg")` (status 500), `throw new Error("msg", 404)`, and `throw "msg"` (sugar for `new Error("msg")`). `throw e;` rethrows a caught `Error`.
 * `catch (err) { ... }` binds `err: Error`. `catch { ... }` without binding is allowed.
 * Runtime errors use the same mechanism: `BadRequest` (status 400) from `ctx.paramInt`, `s.toInt`; out-of-memory (503, §6.2); database errors (500); pool timeout (503); client disconnect (499, logged only); division by zero, index out of range, null assertion (500).
@@ -209,7 +212,7 @@ Members: `s.len` (int64), `s.eq(t)`, `s.slice(a, b)` (like JavaScript `String.pr
 
 ### 2.11 Builtins
 
-* `console.log(...)` and `console.error(...)`: any number of `string`/number/`bool` arguments, space-separated, newline-terminated, one `write(2)` call per line.
+* `console.debug/info/warn/error(message, fields?)`: emits one structured JSON Lines record to stdout; field data remains nested under `fields`.
 * `Context` (`ctx`):
   * fields: `ctx.method`, `ctx.path`, `ctx.rawQuery`, `ctx.body` (all `string`).
   * `ctx.header(name): string` (case-insensitive, `""` if absent), `ctx.query(name): string` (lazily percent-decoded into the arena only when the raw value contains `%` or `+`, §8.3; `""` if absent), `ctx.param(name): string`, `ctx.paramInt(name): int64` (§8.2, throws `BadRequest`).

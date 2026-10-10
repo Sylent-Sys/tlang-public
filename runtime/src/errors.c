@@ -7,6 +7,13 @@
 #include <stdio.h>
 
 void tlang_throw(tlang_fiber* fib, int32_t status, tlang_string message) {
+    tlang_throw_typed(fib, status, message,
+                      TLANG_STR(TLANG_ERROR_INTERNAL),
+                      TLANG_STR(TLANG_ERROR_CODE_INTERNAL));
+}
+
+void tlang_throw_typed(tlang_fiber* fib, int32_t status, tlang_string message,
+                       tlang_string category, tlang_string code) {
     fib->err = 1;
     fib->error.status = status;
     if (message.data == NULL) {
@@ -15,10 +22,12 @@ void tlang_throw(tlang_fiber* fib, int32_t status, tlang_string message) {
     } else {
         fib->error.message = message;
     }
+    fib->error.category = category.data == NULL ? TLANG_STR(TLANG_ERROR_INTERNAL) : category;
+    fib->error.code = code.data == NULL ? TLANG_STR(TLANG_ERROR_CODE_INTERNAL) : code;
 }
 
 void tlang_throw_value(tlang_fiber* fib, tlang_error err) {
-    tlang_throw(fib, err.status, err.message);
+    tlang_throw_typed(fib, err.status, err.message, err.category, err.code);
 }
 
 tlang_error tlang_take_error(tlang_fiber* fib) {
@@ -28,10 +37,14 @@ tlang_error tlang_take_error(tlang_fiber* fib) {
     } else {
         e.status = 0;
         e.message = TLANG_STR("");
+        e.category = TLANG_STR("");
+        e.code = TLANG_STR("");
     }
     fib->err = 0;
     fib->error.status = 0;
     fib->error.message = TLANG_STR("");
+    fib->error.category = TLANG_STR("");
+    fib->error.code = TLANG_STR("");
     return e;
 }
 
@@ -48,7 +61,9 @@ void tlang_throw_fmt(tlang_fiber* fib, int32_t status, const char* fmt, ...) {
 
     if (n < 0) {
         /* Encoding error: fall back to an empty message. */
-        tlang_throw(fib, status, TLANG_STR(""));
+        tlang_throw_typed(fib, status, TLANG_STR(""),
+                          TLANG_STR(TLANG_ERROR_INTERNAL),
+                          TLANG_STR(TLANG_ERROR_CODE_INTERNAL));
         return;
     }
 
@@ -66,5 +81,35 @@ void tlang_throw_fmt(tlang_fiber* fib, int32_t status, const char* fmt, ...) {
 
     msg.data = copy;
     msg.len = (size_t)n;
-    tlang_throw(fib, status, msg);
+    tlang_throw_typed(fib, status, msg,
+                      TLANG_STR(TLANG_ERROR_INTERNAL),
+                      TLANG_STR(TLANG_ERROR_CODE_INTERNAL));
+}
+
+void tlang_throw_fmt_typed(tlang_fiber* fib, int32_t status, tlang_string category,
+                           tlang_string code, const char* fmt, ...) {
+    char stackbuf[1024];
+    va_list ap;
+    int n;
+    char* copy;
+    tlang_string msg;
+
+    va_start(ap, fmt);
+    n = vsnprintf(stackbuf, sizeof stackbuf, fmt, ap);
+    va_end(ap);
+    if (n < 0) {
+        tlang_throw_typed(fib, status, TLANG_STR(""), category, code);
+        return;
+    }
+    copy = (char*)tlang_alloc_raw(fib, (size_t)n + 1);
+    if ((size_t)n < sizeof stackbuf) {
+        if (n != 0) memcpy(copy, stackbuf, (size_t)n);
+    } else {
+        va_start(ap, fmt);
+        vsnprintf(copy, (size_t)n + 1, fmt, ap);
+        va_end(ap);
+    }
+    msg.data = copy;
+    msg.len = (size_t)n;
+    tlang_throw_typed(fib, status, msg, category, code);
 }

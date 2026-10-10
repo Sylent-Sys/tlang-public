@@ -33,6 +33,7 @@ func TestMangleAndCType(t *testing.T) {
 		{arr(arr(user)), "arr_arr_User", "tlang_slice_arr_User*"},
 		{arr(opt(str)), "arr_opt_str", "tlang_slice_opt_str*"},
 		{arr(opt(i64)), "arr_opt_i64", "tlang_slice_opt_i64*"},
+		{opt(Typ[JsonValue]), "opt_JsonValue", "tlang_opt_json_value"},
 		{arr(pu), "arr_Page__User", "tlang_slice_Page__User*"},
 		{opt(i32), "opt_i32", "tlang_opt_i32"},
 		{opt(i64), "opt_i64", "tlang_opt_i64"},
@@ -61,7 +62,7 @@ func TestMangleAndCType(t *testing.T) {
 	if JSONParseCName(user) != "tlj_parse_User" || JSONWriteCName(arr(pu)) != "tlj_write_arr_Page__User" {
 		t.Error("JSON names")
 	}
-	for _, e := range []Type{i32, i64, f64, bl, str} {
+	for _, e := range []Type{i32, i64, f64, bl, str, opt(Typ[JsonValue])} {
 		if !PredefinedSlice(e) {
 			t.Errorf("PredefinedSlice(%v) = false", e)
 		}

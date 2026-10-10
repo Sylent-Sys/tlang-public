@@ -100,6 +100,9 @@ func IsBasic(t Type, k BasicKind) bool {
 	return ok && b.Kind == k
 }
 
+// IsNull reports whether t is the untyped null literal type.
+func IsNull(t Type) bool { return IsBasic(t, UntypedNull) }
+
 // IsInvalid reports whether t is Typ[Invalid].
 func IsInvalid(t Type) bool { return IsBasic(t, Invalid) }
 
@@ -165,7 +168,7 @@ func IsReference(t Type) bool {
 	case *Named, *Array:
 		return true
 	case *Basic:
-		return t.Kind == Context || t.Kind == Transaction
+		return t.Kind == Context || t.Kind == Transaction || t.Kind == JsonValue
 	case *Optional:
 		return IsReference(t.Elem)
 	}
@@ -183,7 +186,7 @@ func HasRegion(t Type) bool {
 		return true
 	case *Basic:
 		switch t.Kind {
-		case String, Error, Context, Transaction:
+		case String, Error, Context, Transaction, JsonValue:
 			return true
 		}
 	case *Optional:
@@ -200,7 +203,7 @@ func CanBeOptional(t Type) bool {
 	switch t := t.(type) {
 	case *Basic:
 		switch t.Kind {
-		case Int32, Int64, Float64, Bool, String, Invalid:
+		case Int32, Int64, Float64, Bool, String, JsonValue, Invalid:
 			return true
 		}
 		return false
@@ -220,7 +223,7 @@ func ValidTypeArg(t Type) bool {
 	switch t := t.(type) {
 	case *Basic:
 		switch t.Kind {
-		case Int32, Int64, Float64, Bool, String, Invalid:
+		case Int32, Int64, Float64, Bool, String, JsonValue, Invalid:
 			return true
 		}
 		return false
@@ -240,7 +243,7 @@ func HasZeroValue(t Type) bool {
 	switch t := t.(type) {
 	case *Basic:
 		switch t.Kind {
-		case Int32, Int64, Float64, Bool, String, Invalid:
+		case Int32, Int64, Float64, Bool, String, JsonValue, Invalid:
 			return true
 		}
 	case *Optional:
@@ -258,7 +261,7 @@ func Comparable(t Type) bool {
 	switch t := t.(type) {
 	case *Basic:
 		switch t.Kind {
-		case Int32, Int64, Float64, Bool, String, Context, Transaction, UntypedInt, UntypedFloat, Invalid:
+		case Int32, Int64, Float64, Bool, String, Context, Transaction, JsonValue, UntypedInt, UntypedFloat, Invalid:
 			return true
 		}
 	case *Named, *Array:

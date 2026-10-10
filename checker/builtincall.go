@@ -11,14 +11,11 @@ import (
 // §2.6-§2.11) via BuiltinID.Info(): fixed Params/Result for ordinary ones and
 // bespoke checks for the Special ones (console variadic, push, ctx.match
 // routes, bindJson/json JSON demand, db/tx SQL checks). It records
-// Info.Calls[e] and seeds Info.Routes/DBTypes/UsesDB and the JSON demand set.
+// Info.Calls[e] and seeds Info.Routes/DBTypes and the JSON demand set.
 
 // callBuiltin types a builtin member or namespace call.
 func (c *checker) callBuiltin(sc *scope, e *ast.CallExpression, m *ast.MemberExpression, sel *types.Selection, facts factSet) types.TypeAndValue {
 	id := sel.Builtin
-	if id.IsDB() {
-		c.info.UsesDB = true
-	}
 	if id.Info().Special {
 		return c.callSpecialBuiltin(sc, e, m, sel, facts)
 	}
@@ -51,8 +48,15 @@ func (c *checker) callOrdinaryBuiltin(sc *scope, e *ast.CallExpression, m *ast.M
 // callSpecialBuiltin dispatches the special-cased builtins.
 func (c *checker) callSpecialBuiltin(sc *scope, e *ast.CallExpression, m *ast.MemberExpression, sel *types.Selection, facts factSet) types.TypeAndValue {
 	switch sel.Builtin {
-	case types.BuiltinConsoleLog, types.BuiltinConsoleInfo, types.BuiltinConsoleError:
+	case types.BuiltinConsoleInfoFields, types.BuiltinConsoleErrorFields,
+		types.BuiltinConsoleDebugFields, types.BuiltinConsoleWarnFields:
 		return c.callConsole(sc, e, m, sel, facts)
+	case types.BuiltinJsonBool, types.BuiltinJsonNumber,
+		types.BuiltinJsonString, types.BuiltinJsonArray, types.BuiltinJsonObject,
+		types.BuiltinJsonAsBool, types.BuiltinJsonAsNumber, types.BuiltinJsonAsString,
+		types.BuiltinJsonArrayValues, types.BuiltinJsonObjectKeys,
+		types.BuiltinJsonObjectValues, types.BuiltinJsonGet:
+		return c.callJson(sc, e, m, sel, facts)
 	case types.BuiltinArrayPush:
 		return c.callPush(sc, e, m, sel, facts)
 	case types.BuiltinCtxMatch:
@@ -77,18 +81,53 @@ func (c *checker) callSpecialBuiltin(sc *scope, e *ast.CallExpression, m *ast.Me
 // callConsole types console.log/error: any number of string, number or bool
 // arguments; result void.
 func (c *checker) callConsole(sc *scope, e *ast.CallExpression, m *ast.MemberExpression, sel *types.Selection, facts factSet) types.TypeAndValue {
-	for _, a := range e.Arguments {
-		tv := c.expr(sc, a, facts, nil)
-		if types.IsInvalid(tv.Type) {
-			continue
-		}
-		t := types.Default(tv.Type)
-		if !types.IsNumeric(t) && !types.IsString(t) && !types.IsBool(t) {
-			c.errorf(a.Pos(), "E-TYPE", "%s accepts only string, number or bool, got %s", sel.Builtin, tv.Type)
-		}
+	if len(e.Arguments) != 2 {
+		c.errorf(e.Lparen, "E-TYPE", "%s expects a message and optional fields", sel.Builtin)
+	}
+	if len(e.Arguments) > 0 {
+		tv := c.expr(sc, e.Arguments[0], facts, types.Typ[types.String])
+		c.assign(sc, e.Arguments[0], tv, types.Typ[types.String])
+	}
+	if len(e.Arguments) > 1 {
+		want := types.NewOptional(types.Typ[types.JsonValue])
+		tv := c.expr(sc, e.Arguments[1], facts, want)
+		c.assign(sc, e.Arguments[1], tv, want)
+	}
+	for i := 2; i < len(e.Arguments); i++ {
+		c.expr(sc, e.Arguments[i], facts, nil)
 	}
 	c.recordBuiltinCall(e, m, sel.Builtin, nil)
 	return c.record(e, types.Typ[types.Void], nil)
+}
+
+func (c *checker) callJson(sc *scope, e *ast.CallExpression, m *ast.MemberExpression, sel *types.Selection, facts factSet) types.TypeAndValue {
+	in := sel.Builtin.Info()
+	paramTypes := in.Params
+	if len(e.Arguments) != len(paramTypes) {
+		c.errorf(e.Lparen, "E-TYPE", "%s expects %d argument(s), got %d", sel.Builtin, len(paramTypes), len(e.Arguments))
+	}
+	for i, a := range e.Arguments {
+		want := types.Type(nil)
+		if sel.Builtin.Info().Recv == types.RecvJsonValue {
+			if i < len(paramTypes) {
+				want = paramTypes[i]
+			}
+		} else if sel.Builtin.Info().Recv == types.RecvJsonType {
+			if i < len(paramTypes) {
+				want = paramTypes[i]
+			}
+		} else if i < len(paramTypes) {
+			want = paramTypes[i]
+		}
+		if want != nil {
+			tv := c.expr(sc, a, facts, want)
+			c.assign(sc, a, tv, want)
+		} else {
+			c.expr(sc, a, facts, nil)
+		}
+	}
+	c.recordBuiltinCall(e, m, sel.Builtin, nil)
+	return c.record(e, in.Result, nil)
 }
 
 // callPush types xs.push(v): one argument assignable to the array element
@@ -114,7 +153,7 @@ func (c *checker) callPush(sc *scope, e *ast.CallExpression, m *ast.MemberExpres
 // Info.Routes (ID = index+1) and sets Call.Route; result bool.
 func (c *checker) callMatch(sc *scope, e *ast.CallExpression, m *ast.MemberExpression, sel *types.Selection, facts factSet) types.TypeAndValue {
 	var route *types.Route
-	if len(e.Arguments) != 2 {
+	if len(e.Arguments) < 1 || len(e.Arguments) > 2 {
 		c.errorf(e.Lparen, "E-ROUTE", "match takes a method and a pattern")
 		c.checkArgsLoose(sc, e, facts)
 	} else {
@@ -186,7 +225,7 @@ func (c *checker) callBindJSON(sc *scope, e *ast.CallExpression, m *ast.MemberEx
 // of serializable values seeding a JSON write demand (E-JSON otherwise);
 // result void.
 func (c *checker) callJSON(sc *scope, e *ast.CallExpression, m *ast.MemberExpression, sel *types.Selection, facts factSet) types.TypeAndValue {
-	if len(e.Arguments) != 2 {
+	if len(e.Arguments) < 1 || len(e.Arguments) > 2 {
 		c.errorf(e.Lparen, "E-TYPE", "json takes a status and a value")
 		c.checkArgsLoose(sc, e, facts)
 	} else {

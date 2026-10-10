@@ -9,6 +9,72 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
+
+static pthread_mutex_t g_console_json_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void diagnostic_drop(void) {
+    static const char msg[] = "tlang: warning: structured console record dropped (over 1 MiB or serialization failure)\n";
+    tlang_log_write(STDERR_FILENO, msg, sizeof msg - 1);
+}
+
+void tlang_console_json_write_record(int fd, tlang_string record) {
+    int rc = pthread_mutex_lock(&g_console_json_mutex);
+    if (rc != 0) return;
+    (void)write(fd, record.data, record.len);
+    (void)pthread_mutex_unlock(&g_console_json_mutex);
+}
+
+void tlang_console_json(tlang_fiber* fib, int level, tlang_string message,
+                        const tlang_json_value* fields) {
+    static const char* const names[] = {"debug", "info", "warn", "error"};
+    char timestamp[40];
+    struct timespec ts;
+    struct tm tm;
+    tlang_buf b;
+    tlang_string key;
+    (void)fib;
+    if (level < TLANG_LOG_DEBUG || level > TLANG_LOG_ERROR) level = TLANG_LOG_INFO;
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0 || gmtime_r(&ts.tv_sec, &tm) == NULL) {
+        diagnostic_drop(); return;
+    }
+    if (strftime(timestamp, sizeof timestamp, "%Y-%m-%dT%H:%M:%S", &tm) == 0) { diagnostic_drop(); return; }
+    {
+        size_t n = strlen(timestamp);
+        int m = snprintf(timestamp + n, sizeof timestamp - n, ".%09ldZ", ts.tv_nsec);
+        if (m < 0 || (size_t)m >= sizeof timestamp - n) { diagnostic_drop(); return; }
+    }
+    {
+        MemoryArena arena;
+        tlang_fiber local;
+        if (tlang_arena_init(&arena) != 0) { diagnostic_drop(); return; }
+        memset(&local, 0, sizeof local); local.arena = &arena;
+        tlang_buf_init(&local, &b, 512);
+        TLANG_BUF_PUT_LIT(&b, "{\"timestamp\":");
+        key = tlang_str_cstr(timestamp); json_write_str_utf8(&b, key);
+        TLANG_BUF_PUT_LIT(&b, ",\"level\":"); json_write_str_utf8(&b, tlang_str_cstr(names[level]));
+        TLANG_BUF_PUT_LIT(&b, ",\"message\":"); json_write_str_utf8(&b, message);
+        TLANG_BUF_PUT_LIT(&b, ",\"fields\":");
+        if (tlang_json_is_object(fields)) tlang_json_write_value(&b, fields, 0);
+        else TLANG_BUF_PUT_LIT(&b, "{}");
+        TLANG_BUF_PUT_LIT(&b, "}\n");
+        if (b.len > TLANG_LOG_MAX_RECORD_BYTES) {
+            tlang_arena_destroy(&arena); diagnostic_drop(); return;
+        }
+        int rc = pthread_mutex_lock(&g_console_json_mutex);
+        if (rc == 0) {
+            size_t off = 0;
+            while (off < b.len) {
+                ssize_t n = write(STDOUT_FILENO, b.data + off, b.len - off);
+                if (n < 0) { if (errno == EINTR) continue; break; }
+                if (n == 0) break;
+                off += (size_t)n;
+            }
+            (void)pthread_mutex_unlock(&g_console_json_mutex);
+        }
+        tlang_arena_destroy(&arena);
+    }
+}
 
 /* ------------------------------------------------------------------ *
  * Low-level write with EINTR / short-write retry

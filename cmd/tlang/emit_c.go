@@ -20,7 +20,7 @@ func splitPositional(args []string) (file string, flagArgs []string) {
 	found := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
-		if a == "-o" || a == "--o" {
+		if a == "-o" || a == "--o" || a == "--tlang-grants" {
 			flagArgs = append(flagArgs, a)
 			if i+1 < len(args) {
 				i++
@@ -68,18 +68,21 @@ func runEmitC(args []string, stdout, stderr io.Writer) int {
 		fs.Usage()
 		return exitUsage
 	}
-	path := file
+	path, projectRoot, discovered, ok := resolveProjectInputWithManifest(file, stderr)
+	if !ok {
+		return exitUsage
+	}
 
 	if _, ok := loadSource(path, stderr); !ok {
 		return exitUsage
 	}
 
-	res := runFrontendGraph(path, stderr)
+	res := runFrontendGraph(path, projectRoot, discovered, stderr)
 	if res.hasErrs {
 		return exitFail
 	}
 
-	cbytes, err := codegen.Emit(res.prog, res.info)
+	cbytes, err := emitProgram(res)
 	if err != nil {
 		fmt.Fprintf(stderr, "tlang: %v\n", err)
 		return exitFail
@@ -98,4 +101,8 @@ func runEmitC(args []string, stdout, stderr io.Writer) int {
 		return exitFail
 	}
 	return exitOK
+}
+
+func emitProgram(res frontendResult) ([]byte, error) {
+	return codegen.Emit(res.prog, res.info)
 }

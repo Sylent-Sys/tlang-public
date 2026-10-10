@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -306,6 +307,16 @@ func TestRunUsesRunFormForTCC(t *testing.T) {
 	last := p.Steps[len(p.Steps)-1].Argv
 	if last[len(last)-1] != "-run" {
 		t.Errorf("last argv token = %q, want -run", last[len(last)-1])
+	}
+}
+
+func TestRuntimeGrantArgumentForwarding(t *testing.T) {
+	want := []string{"--tlang-grants", "C:\\secure\\runtime grants.json"}
+	if got := runtimeGrantArgs(want[1]); !reflect.DeepEqual(got, want) {
+		t.Fatalf("runtimeGrantArgs() = %q, want %q", got, want)
+	}
+	if got := runtimeGrantArgs(""); len(got) != 0 {
+		t.Fatalf("runtimeGrantArgs(empty) = %q, want no args", got)
 	}
 }
 

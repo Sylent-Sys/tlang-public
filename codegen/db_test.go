@@ -131,18 +131,14 @@ fn route_dispatcher(ctx: Context): void {
 	}
 }
 
-// TestConsoleKinds checks the console argument kind wrapping (codegen design
-// §10.1): the five base kinds, NULL, 0 for no arguments, and a sized array.
+// TestConsoleKinds checks message serialization and level selection.
 func TestConsoleKinds(t *testing.T) {
 	out := mustEmit(t, `fn f(n: int64, i: int32, s: string, fl: float64, b: bool): void {
-    console.info();
-    console.info(s, n, i, fl, b, 7, 2.5, true);
+    console.info("ready", JsonValue.string("ready"));
+    console.info("ready", JsonValue.string("ready"));
 }
 `)
-	if !strings.Contains(out, "tlang_console_log(__fib, NULL, 0);") && !strings.Contains(out, "tlang_console_info(__fib, NULL, 0);") {
-		t.Error("zero-arg console should be NULL, 0")
-	}
-	if !strings.Contains(out, "(tlang_value[8]){ TLANG_VAL_STR(l_s), TLANG_VAL_I64(l_n), TLANG_VAL_I32(l_i), TLANG_VAL_F64(l_fl), TLANG_VAL_BOOL(l_b), TLANG_VAL_I64(7), TLANG_VAL_F64(2.5), TLANG_VAL_BOOL(true) }, 8") {
-		t.Error("console argument wrapping wrong")
+	if !strings.Contains(out, `tlang_console_json(__fib, TLANG_LOG_INFO, TLANG_STR("ready"),`) {
+		t.Error("structured console info call missing")
 	}
 }

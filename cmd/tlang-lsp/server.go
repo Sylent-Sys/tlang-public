@@ -15,7 +15,8 @@ type Server struct {
 	store *documentStore
 
 	// roots are the workspace folders (absolute paths) from initialize; the
-	// longest one containing a document bounds its import resolution.
+	// longest one containing a document seeds project/manifest discovery and
+	// bounds imports when no valid manifest is found.
 	roots []string
 	// cache holds the analysis of each open document. Any document event
 	// can change any analysis (an edited file may be imported by the others),

@@ -12,8 +12,8 @@ import (
 // via NamespaceMember, numeric conversions via ConversionOf, generic user
 // calls via Infer+InstantiateFunc, and the special-cased builtins (console,
 // push, ctx.match routes, bindJson/json JSON demand, db/tx SQL checks). It
-// fills Info.Selections/Calls and seeds Info.Routes/DBTypes/UsesDB and the
-// JSON demand set.
+// fills Info.Selections/Calls and seeds Info.Routes/DBTypes and the JSON
+// demand set. Entry-rooted runtime feature analysis runs after entry selection.
 
 // ---------------------------------------------------------------------------
 // Member selections (not callees)
@@ -57,9 +57,38 @@ func (c *checker) exprMember(sc *scope, e *ast.MemberExpression, facts factSet) 
 // callee-only builtins are valid). It returns the Selection, or nil on an
 // error that was reported.
 func (c *checker) resolveSelection(sc *scope, m *ast.MemberExpression, facts factSet, asCallee bool) *types.Selection {
+	if id, ok := m.Object.(*ast.Identifier); ok && id.Name == "JsonValue" && asCallee {
+		if tn, ok := sc.lookup(id.Name).(*types.TypeName); ok && types.IsBasic(tn.Type, types.JsonValue) {
+			member := types.JsonValueConstructor(m.Property.Name)
+			if member == types.BuiltinInvalid {
+				c.errorf(m.Property.NamePos, "E-TYPE", "JsonValue has no constructor %s", m.Property.Name)
+				return nil
+			}
+			c.info.Uses[id] = tn
+			sel := &types.Selection{Kind: types.SelBuiltin, Builtin: member}
+			c.info.Selections[m] = sel
+			return sel
+		}
+	}
 	if obj, id := c.namespaceObject(sc, m.Object, facts); obj != nil {
 		switch ns := obj.(type) {
 		case *types.Builtin:
+			if ns.ID == types.BuiltinConsole && asCallee && m.Property.Name != "error" {
+				member := types.StructuredConsoleMember(m.Property.Name)
+				if member == types.BuiltinInvalid {
+					member = types.StaticConsoleMember(m.Property.Name)
+				}
+				if member != types.BuiltinInvalid {
+					sel := &types.Selection{Kind: types.SelBuiltin, Builtin: member}
+					c.info.Selections[m] = sel
+					return sel
+				}
+				legacy := types.NamespaceMember(ns.ID, m.Property.Name)
+				if legacy == types.BuiltinInvalid && (m.Property.Name == "log") {
+					c.errorf(m.Property.NamePos, "E-TYPE", "console.%s is no longer available; use structured console methods", m.Property.Name)
+					return nil
+				}
+			}
 			return c.selectNamespace(m, id, ns, asCallee)
 		case *types.ModuleNS:
 			return c.selectModuleNS(m, id, ns, asCallee)
@@ -103,12 +132,18 @@ func (c *checker) resolveSelection(sc *scope, m *ast.MemberExpression, facts fac
 	// Builtin member of the value (defaults the receiver, so 5.toString()
 	// works).
 	id := types.MemberOf(recv, m.Property.Name)
+	if types.IsBasic(recv, types.Error) {
+		id = types.ErrorMemberOf(m.Property.Name)
+	}
 	if id == types.BuiltinInvalid {
 		c.errorf(m.Property.NamePos, "E-TYPE", "%s has no field or method %s", recv, m.Property.Name)
 		return nil
 	}
 	sel := &types.Selection{Kind: types.SelBuiltin, Recv: recv, Builtin: id}
 	in := id.Info()
+	if errorInfo := types.ErrorBuiltinInfo(id); errorInfo != nil {
+		in = errorInfo
+	}
 	if !in.Method {
 		sel.Type = in.Result // field-like: s.len, ctx.path, err.status
 	}
@@ -187,7 +222,7 @@ func (c *checker) selectModuleNS(m *ast.MemberExpression, id *ast.Identifier, ns
 	return nil
 }
 
-// selectNamespace resolves a member of the console or db namespace.
+// selectNamespace resolves a member of a builtin namespace.
 func (c *checker) selectNamespace(m *ast.MemberExpression, id *ast.Identifier, b *types.Builtin, asCallee bool) *types.Selection {
 	member := types.StandardNamespaceMember(b.ID, m.Property.Name)
 	if member == types.BuiltinInvalid {

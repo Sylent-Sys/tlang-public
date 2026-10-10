@@ -40,6 +40,8 @@ static void reset(void) {
     g_fib.err = 0;
     g_fib.error.status = 0;
     g_fib.error.message = TLANG_STR("");
+    g_fib.error.category = TLANG_STR("");
+    g_fib.error.code = TLANG_STR("");
 }
 
 /* Every db call throws 500 TLANG_MSG_NO_DB and returns the zero value. */
@@ -51,6 +53,8 @@ static void test_db_calls_throw(void) {
     CHECK(tlang_db_execute(&g_fib, NULL, TLANG_STR("SELECT 1"), NULL, 0) == 0);
     CHECK(g_fib.err && g_fib.error.status == 500);
     CHECK(msg_is(g_fib.error.message, "database support not compiled in"));
+    CHECK(msg_is(g_fib.error.category, TLANG_ERROR_DATABASE));
+    CHECK(msg_is(g_fib.error.code, TLANG_ERROR_CODE_DATABASE_UNAVAILABLE));
 
     reset();
     CHECK(tlang_db_query(&g_fib, NULL, TLANG_STR("SELECT 1"), NULL, 0, &desc) == NULL);

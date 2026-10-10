@@ -2,7 +2,6 @@ package codegen
 
 import (
 	"strconv"
-	"strings"
 
 	"tlang/ast"
 	"tlang/types"
@@ -55,12 +54,44 @@ func (fc *funcCtx) callBuiltin(e *ast.CallExpression, c *types.Call, discard boo
 		return fc.toString(e, c, "tlang_f64_to_string", discard)
 	case types.BuiltinBoolToString:
 		return fc.toString(e, c, "tlang_bool_to_string", discard)
-	case types.BuiltinConsoleLog:
-		return fc.consoleBuiltin(e, c, "tlang_console_log")
-	case types.BuiltinConsoleInfo:
-		return fc.consoleBuiltin(e, c, "tlang_console_info")
-	case types.BuiltinConsoleError:
-		return fc.consoleBuiltin(e, c, "tlang_console_error")
+	case types.BuiltinConsoleInfoFields:
+		return fc.consoleBuiltin(e, c, "TLANG_LOG_INFO")
+	case types.BuiltinConsoleErrorFields:
+		return fc.consoleBuiltin(e, c, "TLANG_LOG_ERROR")
+	case types.BuiltinConsoleDebugFields:
+		return fc.consoleBuiltin(e, c, "TLANG_LOG_DEBUG")
+	case types.BuiltinConsoleWarnFields:
+		return fc.consoleBuiltin(e, c, "TLANG_LOG_WARN")
+	case types.BuiltinEnvGet:
+		return fc.envGet(e, c, discard)
+	case types.BuiltinJsonFromNull:
+		return fc.jsonBuiltin(e, c, "tlang_json_null", discard)
+	case types.BuiltinJsonBool:
+		return fc.jsonBuiltin(e, c, "tlang_json_bool", discard)
+	case types.BuiltinJsonNumber:
+		return fc.jsonBuiltin(e, c, "tlang_json_number", discard)
+	case types.BuiltinJsonString:
+		return fc.jsonBuiltin(e, c, "tlang_json_string", discard)
+	case types.BuiltinJsonArray:
+		return fc.jsonBuiltin(e, c, "tlang_json_array", discard)
+	case types.BuiltinJsonObject:
+		return fc.jsonBuiltin(e, c, "tlang_json_object", discard)
+	case types.BuiltinJsonKind:
+		return fc.jsonMember(e, c, "tlang_json_describe", discard)
+	case types.BuiltinJsonAsBool:
+		return fc.jsonMember(e, c, "tlang_json_as_bool", discard)
+	case types.BuiltinJsonAsNumber:
+		return fc.jsonMember(e, c, "tlang_json_as_number", discard)
+	case types.BuiltinJsonAsString:
+		return fc.jsonMember(e, c, "tlang_json_as_string", discard)
+	case types.BuiltinJsonArrayValues:
+		return fc.jsonMember(e, c, "tlang_json_array_values", discard)
+	case types.BuiltinJsonObjectKeys:
+		return fc.jsonMember(e, c, "tlang_json_object_keys", discard)
+	case types.BuiltinJsonObjectValues:
+		return fc.jsonMember(e, c, "tlang_json_object_values", discard)
+	case types.BuiltinJsonGet:
+		return fc.jsonMember(e, c, "tlang_json_get", discard)
 	case types.BuiltinCtxHeader:
 		return fc.ctxPure(e, c, "tlang_ctx_header", false, discard)
 	case types.BuiltinCtxQuery:
@@ -94,6 +125,86 @@ func (fc *funcCtx) callBuiltin(e *ast.CallExpression, c *types.Call, discard boo
 	}
 	fc.g.fail(notImplemented(e.Pos(), "builtin "+c.Builtin.String()))
 	return cval{}
+}
+
+// emitEnvGetProto emits the future environment ABI declaration when a checked
+// program contains an env.get call. The runtime implementation and header are
+// intentionally supplied by a later phase.
+// envGet lowers env.get(name) to the optional-string ABI. Denial is reported
+// through the fiber error and is checked after the result is materialized;
+// an authorized unset value is represented by a string with null data.
+func (g *generator) emitEnvGetProto(w *cwriter) {
+	for _, call := range g.info.Calls {
+		if call != nil && call.Kind == types.CallBuiltin && call.Builtin == types.BuiltinEnvGet {
+			w.line("extern tlang_string tlang_env_get(tlang_fiber*, tlang_string);")
+			return
+		}
+	}
+}
+
+func (fc *funcCtx) envGet(e *ast.CallExpression, c *types.Call, discard bool) cval {
+	args := fc.lowerOperands(e.Arguments)
+	code := "tlang_env_get(__fib, " + args[0].code + ")"
+	if discard {
+		fc.blk.linef("(void)(%s);", code)
+		fc.check()
+		return cval{}
+	}
+	result := fc.spill(opVal(code, false), c.Builtin.Info().Result)
+	fc.check()
+	return result
+}
+
+func (fc *funcCtx) jsonBuiltin(e *ast.CallExpression, c *types.Call, fn string, discard bool) cval {
+	args := fc.lowerOperands(e.Arguments)
+	if c.Builtin == types.BuiltinJsonNumber && len(args) > 0 {
+		args[0].code = "(double)(" + args[0].code + ")"
+	}
+	var code string
+	if c.Builtin == types.BuiltinJsonFromNull {
+		code = fn + "(__fib)"
+	} else if c.Builtin == types.BuiltinJsonArray {
+		if args[0].code == "NULL" {
+			code = fn + "(__fib, NULL, 0)"
+		} else {
+			code = fn + "(__fib, (const tlang_json_value* const*)" + args[0].code + "->items, " + args[0].code + "->len)"
+		}
+	} else if c.Builtin == types.BuiltinJsonObject {
+		if args[0].code == "NULL" || args[1].code == "NULL" {
+			code = fn + "(__fib, NULL, NULL, 0)"
+		} else {
+			code = fn + "(__fib, " + args[0].code + "->items, (const tlang_json_value* const*)" + args[1].code + "->items, " + args[0].code + "->len)"
+		}
+	} else {
+		code = fn + "(__fib, " + args[0].code + ")"
+	}
+	return fc.jsonResult(e, c, code, discard)
+}
+
+func (fc *funcCtx) jsonMember(e *ast.CallExpression, c *types.Call, fn string, discard bool) cval {
+	recv, args := fc.builtinOperands(e, c)
+	var code string
+	if len(args) == 0 {
+		code = fn + "(__fib, " + recv.code + ")"
+	} else {
+		code = fn + "(__fib, " + recv.code + ", " + args[0].code + ")"
+	}
+	return fc.jsonResult(e, c, code, discard)
+}
+
+func (fc *funcCtx) jsonResult(e *ast.CallExpression, c *types.Call, code string, discard bool) cval {
+	if discard {
+		fc.blk.linef("(void)(%s);", code)
+		if c.Builtin.MayFail() {
+			fc.check()
+		}
+		return cval{}
+	}
+	result := fc.spill(opVal(code, false), c.Builtin.Info().Result)
+	if c.Builtin.MayFail() {
+		fc.check()
+	}
+	return result
 }
 
 // builtinOperands lowers the receiver and arguments of a value-member builtin
@@ -189,18 +300,17 @@ func (fc *funcCtx) pushBuiltin(e *ast.CallExpression, c *types.Call, discard boo
 // compound literal). console returns void, so it is always a statement.
 // Side-effecting arguments are spilled left-to-right with their err checks
 // before the compound literal is built (plan D7, §6.5).
-func (fc *funcCtx) consoleBuiltin(e *ast.CallExpression, c *types.Call, fn string) cval {
-	n := len(e.Arguments)
-	if n == 0 {
-		fc.blk.linef("%s(__fib, NULL, 0);", fn)
-		return cval{}
-	}
+func (fc *funcCtx) consoleBuiltin(e *ast.CallExpression, c *types.Call, level string) cval {
 	vals := fc.lowerOperands(e.Arguments)
-	parts := make([]string, n)
-	for i, a := range e.Arguments {
-		parts[i] = valWrap(fc.typ(a), vals[i])
+	message := "TLANG_STR(\"\")"
+	fields := "NULL"
+	if len(vals) > 0 {
+		message = vals[0].code
 	}
-	fc.blk.linef("%s(__fib, (tlang_value[%d]){ %s }, %d);", fn, n, strings.Join(parts, ", "), n)
+	if len(vals) > 1 {
+		fields = vals[1].code
+	}
+	fc.blk.linef("tlang_console_json(__fib, %s, %s, %s);", level, message, fields)
 	return cval{}
 }
 

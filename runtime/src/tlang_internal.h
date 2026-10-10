@@ -142,6 +142,12 @@ void tlang_config_defaults(tlang_config* cfg);
  * truncated to errlen); tlang_main then exits with status 2. */
 int tlang_config_load(tlang_config* cfg, char* err, size_t errlen);
 
+/* Parse and validate the optional/required runtime grant document against the
+ * generated, non-secret manifest metadata before startup creates resources. */
+int tlang_grants_load_validate(const tlang_program* prog, const char* path,
+                               tlang_config* cfg, char* err, size_t errlen);
+bool tlang_env_name_authorized(tlang_string name);
+
 /* ========================================================================
  * 3. Arena lifecycle (arena.c)
  * ======================================================================== */
@@ -592,6 +598,10 @@ void tlang_log_warn(const char* fmt, ...) TLANG_PRINTF(1, 2);
  * silently on other errors. Thread-safe (no locks; each call is one or more
  * write calls). */
 void tlang_log_write(int fd, const char* data, size_t len);
+void json_write_str_utf8(tlang_buf* b, tlang_string s);
+void tlang_json_write_value(tlang_buf* b, const tlang_json_value* value, int depth);
+bool tlang_json_is_object(const tlang_json_value* value);
+bool tlang_json_is_null(const tlang_json_value* value);
 
 /* ========================================================================
  * 11. Strings, numbers and slices: shared helpers (strings.c, slices.c)
@@ -650,5 +660,7 @@ void tlang_slice_hdr_init(void* hdr, void* items, int64_t len, int64_t cap, bool
  * by tlang_main before scheduler threads start; tests may call it between
  * runs. Not thread-safe. */
 void json_set_max_depth(int depth);
+void json_write_str_utf8(tlang_buf* b, tlang_string s);
+void tlang_json_write_value(tlang_buf* b, const tlang_json_value* value, int depth);
 
 #endif /* TLANG_INTERNAL_H */

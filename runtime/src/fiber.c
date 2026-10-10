@@ -89,6 +89,8 @@ Fiber* tlang_fiber_acquire(tlang_sched* s) {
     f->pub.error.status = 0;
     f->pub.error.message.data = "";
     f->pub.error.message.len = 0;
+    f->pub.error.category = TLANG_STR("");
+    f->pub.error.code = TLANG_STR("");
     f->pub.arena = &f->arena;
     f->pub.globals = s->globals;
     f->fn = NULL;
@@ -123,6 +125,8 @@ void tlang_fiber_release(tlang_sched* s, Fiber* f) {
     f->pub.error.status = 0;
     f->pub.error.message.data = "";
     f->pub.error.message.len = 0;
+    f->pub.error.category = TLANG_STR("");
+    f->pub.error.code = TLANG_STR("");
     f->state = FIBER_DEAD;
     f->fn = NULL;
     f->arg = NULL;

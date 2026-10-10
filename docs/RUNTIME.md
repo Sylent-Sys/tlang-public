@@ -1,6 +1,6 @@
 # TLang Runtime (C): API and Module Map
 
-This document describes the C runtime of TLang v1: how its API is organized, which source file implements each declaration, the rules every module follows, and how generated code uses the API. The headers are authoritative for signatures and for the contract of each function (semantics, lifetime, failure); this document adds the module map and the cross-cutting rules. "§x" points into `TLang_Technical_Specification_1.2.1.md`, "DESIGN §x" into `docs/DESIGN.md`.
+This document describes the C runtime of TLang v1: how its API is organized, which source file implements each declaration, the rules every module follows, and how generated code uses the API. The headers are authoritative for signatures and for the contract of each function (semantics, lifetime, failure); this document adds the module map and the cross-cutting rules. Approved but unimplemented standard API contracts are documented in `docs/DESIGN-modules.md` §12.6 and must not be read as shipped runtime APIs. "§x" points into `TLang_Technical_Specification_1.2.1.md`, "DESIGN §x" into `docs/DESIGN.md`.
 
 ---
 
@@ -22,7 +22,7 @@ This document describes the C runtime of TLang v1: how its API is organized, whi
 These rules come from the comment at the top of `tlang.h` and apply to every declaration in both headers.
 
 1. **Fiber parameter.** A function whose first parameter is `tlang_fiber* fib` may allocate in the fiber arena, may suspend the fiber on I/O, or may fail. A function without it never fails, never suspends and never aborts. Comments mark side-effect-free functions "Pure".
-2. **May fail.** Failure sets `fib->err = 1` and `fib->error = {status, message}` and returns the zero value of the return type. Generated code checks `if (__fib->err) goto <label>;` right after the call. "Never fails" means the function never touches `fib->err`.
+2. **May fail.** Failure sets `fib->err = 1` and `fib->error = {status, message, category, code}` and returns the zero value of the return type. `category` and `code` are appended after the original `status`/`message` fields in the Error ABI. Generated code checks `if (__fib->err) goto <label>;` right after the call. "Never fails" means the function never touches `fib->err`.
 3. **Out of memory is an abort, not an Error.** Allocation never returns NULL and never sets `err`. On OOM (or a size computation that overflows) `tlang_alloc_failed` calls `tlang_request_abort(f, 503, ...)`, which longjmps to the connection loop. The loop runs the cleanup hooks (pooled DB connections are released), answers 503 if nothing was sent, resets the arena and closes the connection. Outside a request (global initialisation, script mode) the process logs and exits with status 1. Only the raw primitives `arena_grow`/`arena_alloc` and `json_scan_string` report allocation failure to their caller.
 4. **Lifetimes.** *static*: process lifetime. *request*: until the dispatcher returns and the arena is reset (arena memory, request-buffer slices). *global*: heap memory that is never freed.
 5. **Strings.** `{NULL, 0}` is accepted everywhere as `""`. No runtime function returns `data == NULL`; that value is the null of `string | null`.
@@ -30,6 +30,14 @@ These rules come from the comment at the top of `tlang.h` and apply to every dec
 7. **Abort safety.** Inside a request any allocation may longjmp out. Runtime code keeps its data structures consistent at every allocation point and never holds a resource across an allocation unless a cleanup hook releases it.
 8. **Reserved names.** Runtime symbols use the prefixes `tlang_`, `TLANG_`, `json_`, plus the spec names `ArenaChunk`, `MemoryArena`, `ARENA_*`, `arena_*`, `TxContext`, and inside the runtime `Fiber`, `FiberState`, `FiberContext`, `FIBER_*`. Generated code uses `tl_`, `tlj_`, `l_`, `f_`, `g_` and `__` names (DESIGN §3.2) and completes `struct tl_globals`.
 9. **Secrets.** The database URL is never logged, not even in configuration errors. Request bodies are never logged.
+
+The Error category/code fields are implemented in the language model, generated
+C layout, and runtime throw/take/rethrow path. In contrast, the approved project
+grants document is currently parsed and validated only by the Go `project`
+package; the C runtime does not load it or enforce its capabilities. The
+approved `env.get` and structured JSONL console APIs in `docs/DESIGN-modules.md`
+§12.6 are not implemented runtime APIs. Existing runtime console functions emit
+plain text, not those JSONL records.
 
 ---
 
@@ -41,17 +49,17 @@ These rules come from the comment at the top of `tlang.h` and apply to every dec
 | :--- | :--- |
 | 1 Forward declarations | `tlang_fiber`, `tlang_ctx`, `tlang_tx`, incomplete `struct tl_globals` |
 | 2 Strings | `tlang_string`, `TLANG_STR`, `TLANG_STR_INIT`, `TLANG_STR_NULL`, `TLANG_STR_END` |
-| 3 Errors (types) | `tlang_error`, `TLANG_STATUS_*`, `TLANG_MSG_*` |
+| 3 Errors (types) | `tlang_error` (`status`, `message`, appended `category`, `code`), `TLANG_STATUS_*`, `TLANG_MSG_*`, `TLANG_ERROR_*` |
 | 4 Arena | `ArenaChunk`, `MemoryArena`, `ARENA_CHUNK_SIZE` (128 KiB), `ARENA_ALIGNMENT` (8), `arena_grow`, `arena_alloc` (inline), `arena_reset` |
 | 5 Fiber | `struct tlang_fiber { int err; tlang_error error; struct tl_globals* globals; MemoryArena* arena; }` |
-| 6 Throw / catch | `tlang_throw`, `tlang_throw_value`, `tlang_take_error`, `tlang_clear_error`, `tlang_error_make`, `TLANG_THROW_LIT`, `tlang_throw_null/_index/_div_zero` |
+| 6 Throw / catch | `tlang_throw`, `tlang_throw_typed`, `tlang_throw_value`, `tlang_take_error`, `tlang_throw_fmt_typed`, `tlang_clear_error`, `tlang_error_make[_typed]`, `TLANG_THROW_LIT`, `tlang_throw_null/_index/_div_zero` |
 | 7 Allocation | `tlang_alloc_failed`, `tlang_alloc_raw`, `tlang_alloc_zeroed`, `tlang_alloc_global_zeroed` |
 | 8 String operations | `tlang_str_eq/_starts_with/_ends_with/_slice/_index_of/_concat/_clone/_clone_global/_to_int/_some`, `tlang_{i32,i64,f64,bool}_to_string` |
 | 9 Numbers | `tlang_{add,sub,mul,neg}_{i32,i64}`, `tlang_{div,mod}_{i32,i64}`, `tlang_mod_f64`, `tlang_i64_to_i32`, `tlang_f64_to_i32`, `tlang_f64_to_i64` |
 | 10 Optionals | `tlang_opt_{i32,i64,f64,bool}`, `TLANG_SOME`, `TLANG_NONE`, `tlang_unwrap_{i32,i64,f64,bool,str,ptr}` |
 | 11 Arrays | `TLANG_SLICE_DEFINE`, `tlang_slice_{i32,i64,f64,bool,str}`, `tlang_slice_new/_grow/_oob/_at`, `tlang_index_ok`, `TLANG_SLICE_NEW`, `TLANG_SLICE_NEW_GLOBAL`, `TLANG_SLICE_RESERVE`, `TLANG_SLICE_PUSH`, `TLANG_SLICE_AT` |
 | 12 Tagged values | `TLANG_KIND_*`, `tlang_value`, `TLANG_VAL_*`, `tlang_val_opt_*` |
-| 13 Console | `tlang_console_log`, `tlang_console_error` |
+| 13 Console | `tlang_console_log`, `tlang_console_info`, `tlang_console_error` (plain-text output; structured JSONL methods are not implemented) |
 | 14 JSON | `json_skip_ws`, `json_scan_{key,int64,int32,float64,bool,null,string}`, `json_skip_value`, `json_max_depth`, `tlang_buf` + `tlang_buf_{init,grow,reserve,put,putc,put_str,string}`, `TLANG_BUF_PUT_LIT`, `json_write_{str,i64,i32,f64,bool,null}` |
 | 15 Context and routing | `TLANG_MAX_PARAMS` (8), `TLANG_CTX_MAX_HEADERS` (32), `tlang_route_param`, `tlang_http_header`, `tlang_resp_header`, `struct tlang_ctx`, `tlang_ctx_{header,query,param,param_int,text,json,send,set_header,match}`, `TLANG_SEG_*`, `tlang_route_seg`, `tlang_route` |
 | 16 Database | `tlang_pg_param` (= `tlang_value`), `TLANG_PG_*`, `tlang_field_desc`, `tlang_type_desc`, `struct tlang_tx`, `TxContext`, `TLANG_TX_*`, `tlang_db_{execute,query,query_one}`, `tlang_tx_{begin,exec,query,query_one,commit,rollback}` |
@@ -70,7 +78,7 @@ These rules come from the comment at the top of `tlang.h` and apply to every dec
 | 7 Sockets | `tlang_net_{listen,local_port,accept_ready,read,write_all,writev_all,close}` |
 | 8 HTTP connections | `tlang_http_conn_main` |
 | 9 PostgreSQL pool | `tlang_pg_pool_create`, `tlang_pg_pool_destroy` |
-| 10 Errors and logging | `tlang_throw_fmt`, `tlang_log_error`, `tlang_log_warn`, `tlang_log_write` |
+| 10 Errors and logging | `tlang_throw_fmt`, `tlang_throw_fmt_typed`, `tlang_log_error`, `tlang_log_warn`, `tlang_log_write` |
 | 11 Shared helpers | `TLANG_FMT_I64_MAX`, `TLANG_FMT_F64_MAX`, `tlang_fmt_i64`, `tlang_fmt_f64`, `tlang_parse_i64`, `tlang_ascii_ieq`, `tlang_str_cstr`, `TLANG_SLICE_OFF_*`, `TLANG_SLICE_HDR_SIZE`, `tlang_slice_hdr_init` |
 | 12 JSON configuration | `json_set_max_depth` |
 
@@ -84,15 +92,15 @@ The spec §7.1 field `int err` is `pub.err` (payload `pub.error`), so there is o
 
 ## 4. Module ownership map
 
-Every extern function declared in either header is implemented in exactly one file, listed below (105 functions: 52 public, 53 internal). Types, macros and `static inline` functions are defined in the headers themselves; they are listed at the end of this section.
+Every extern function declared in either header is implemented in exactly one file, listed below (108 functions: 55 public, 53 internal). Types, macros and `static inline` functions are defined in the headers themselves; they are listed at the end of this section.
 
 | File | Implements |
 | :--- | :--- |
 | `src/arena.c` | `arena_grow`, `arena_reset`, `tlang_alloc_failed`, `tlang_alloc_global_zeroed`, `tlang_arena_init`, `tlang_arena_destroy` |
-| `src/errors.c` | `tlang_throw`, `tlang_throw_value`, `tlang_take_error`, `tlang_throw_fmt` |
+| `src/errors.c` | `tlang_throw`, `tlang_throw_typed`, `tlang_throw_value`, `tlang_take_error`, `tlang_throw_fmt`, `tlang_throw_fmt_typed` |
 | `src/strings.c` | `tlang_str_index_of`, `tlang_str_concat`, `tlang_str_clone`, `tlang_str_clone_global`, `tlang_str_to_int`, `tlang_i32_to_string`, `tlang_i64_to_string`, `tlang_f64_to_string`, `tlang_mod_f64`, `tlang_buf_init`, `tlang_buf_grow`, `tlang_fmt_i64`, `tlang_fmt_f64`, `tlang_parse_i64`, `tlang_ascii_ieq` |
 | `src/slices.c` | `tlang_slice_new`, `tlang_slice_grow`, `tlang_slice_oob`, `tlang_slice_hdr_init` |
-| `src/console.c` | `tlang_console_log`, `tlang_console_error`, `tlang_log_error`, `tlang_log_warn`, `tlang_log_write` |
+| `src/console.c` | `tlang_console_log`, `tlang_console_info`, `tlang_console_error`, `tlang_log_error`, `tlang_log_warn`, `tlang_log_write` |
 | `src/json.c` | `json_scan_key`, `json_scan_int64`, `json_scan_int32`, `json_scan_float64`, `json_scan_bool`, `json_scan_null`, `json_scan_string`, `json_skip_value`, `json_max_depth`, `json_set_max_depth`, `json_write_str`, `json_write_i64`, `json_write_i32`, `json_write_f64` |
 | `src/ctxswitch.c` | `tlang_fctx_init`, `tlang_fctx_init_thread`, `tlang_fctx_switch`, `tlang_fctx_exit` |
 | `src/fiber.c` | `tlang_fiber_acquire`, `tlang_fiber_release`, `tlang_spawn`, `tlang_fiber_pool_destroy`, `tlang_cleanup_push`, `tlang_cleanup_pop`, `tlang_cleanup_run_all`, `tlang_request_abort` |
@@ -105,7 +113,7 @@ Every extern function declared in either header is implemented in exactly one fi
 | `src/config.c` | `tlang_config_defaults`, `tlang_config_load` |
 | `src/main.c` | `tlang_main` |
 
-**Header-defined (no .c owner).** `tlang.h`: `arena_alloc`, `tlang_clear_error`, `tlang_error_make`, `tlang_throw_null`, `tlang_throw_index`, `tlang_throw_div_zero`, `tlang_alloc_raw`, `tlang_alloc_zeroed`, `tlang_str_eq`, `tlang_str_starts_with`, `tlang_str_ends_with`, `tlang_str_slice`, `tlang_str_some`, `tlang_bool_to_string`, `tlang_{add,sub,mul,neg}_{i32,i64}`, `tlang_{div,mod}_{i32,i64}`, `tlang_i64_to_i32`, `tlang_f64_to_i32`, `tlang_f64_to_i64`, `tlang_unwrap_{i32,i64,f64,bool,str,ptr}`, `tlang_index_ok`, `tlang_slice_at`, `tlang_val_opt_{i32,i64,f64,bool,str}`, `json_skip_ws`, `tlang_buf_reserve`, `tlang_buf_put`, `tlang_buf_putc`, `tlang_buf_put_str`, `tlang_buf_string`, `json_write_bool`, `json_write_null`, `tlang_tx_exec`, `tlang_tx_query`, `tlang_tx_query_one`, and every type and macro. `tlang_internal.h`: `tlang_fiber_of`, `tlang_str_cstr`, `TLANG_ABORT_POINT`, and every type and macro. Changes to either header go through the header owner, because every module and the code generator depend on them.
+**Header-defined (no .c owner).** `tlang.h`: `arena_alloc`, `tlang_clear_error`, `tlang_error_make`, `tlang_error_make_typed`, `tlang_throw_null`, `tlang_throw_index`, `tlang_throw_div_zero`, `tlang_alloc_raw`, `tlang_alloc_zeroed`, `tlang_str_eq`, `tlang_str_starts_with`, `tlang_str_ends_with`, `tlang_str_slice`, `tlang_str_some`, `tlang_bool_to_string`, `tlang_{add,sub,mul,neg}_{i32,i64}`, `tlang_{div,mod}_{i32,i64}`, `tlang_i64_to_i32`, `tlang_f64_to_i32`, `tlang_f64_to_i64`, `tlang_unwrap_{i32,i64,f64,bool,str,ptr}`, `tlang_index_ok`, `tlang_slice_at`, `tlang_val_opt_{i32,i64,f64,bool,str}`, `json_skip_ws`, `tlang_buf_reserve`, `tlang_buf_put`, `tlang_buf_putc`, `tlang_buf_put_str`, `tlang_buf_string`, `json_write_bool`, `json_write_null`, `tlang_tx_exec`, `tlang_tx_query`, `tlang_tx_query_one`, and every type and macro. `tlang_internal.h`: `tlang_fiber_of`, `tlang_str_cstr`, `TLANG_ABORT_POINT`, and every type and macro. Changes to either header go through the header owner, because every module and the code generator depend on them.
 
 **Suggested split between implementers** (the modules of a group call each other most):
 
@@ -175,12 +183,12 @@ int main(int argc, char** argv) { return tlang_main(argc, argv, &__tl_program); 
 | `xs[i]`, `xs[i] = v` | `TLANG_SLICE_AT(__fib, l_xs, i, T)` (lvalue), may fail (500); or `tlang_index_ok` then `l_xs->items[i]` |
 | `xs.len` | `l_xs->len` |
 | `for (const x of xs)` | `for (int64_t __i = 0; __i < l_xs->len; __i++) { T l_x = l_xs->items[__i]; ... }` (re-read `items` each time: the body may push) |
-| `throw new Error(m, s)`, `throw "m"` | `tlang_throw(__fib, s, m)` / `tlang_throw(__fib, 500, TLANG_STR("m"))`, then `goto` |
+| `throw new Error(m, s)`, `throw "m"` | `tlang_throw_typed(__fib, s, m, TLANG_STR("internal"), TLANG_STR("internal"))`, then `goto` |
 | `throw e` | `tlang_throw_value(__fib, l_e)` |
-| `new Error(m)`, `new Error(m, s)` | `tlang_error_make(m, 500)`, `tlang_error_make(m, s)` |
+| `new Error(m)`, `new Error(m, s)` | `tlang_error_make_typed(m, 500, TLANG_STR("internal"), TLANG_STR("internal"))`, `tlang_error_make_typed(m, s, TLANG_STR("internal"), TLANG_STR("internal"))` |
 | `catch (e) { }` / `catch { }` | `tlang_error l_e = tlang_take_error(__fib);` / `tlang_clear_error(__fib);` at the catch label |
-| `e.message`, `e.status` | `l_e.message`, `l_e.status` |
-| `console.log(a, b)` | `tlang_console_log(__fib, (tlang_value[2]){ TLANG_VAL_STR(a), TLANG_VAL_I64(b) }, 2)`; `console.error` likewise |
+| `e.message`, `e.status`, `e.category`, `e.code` | matching `l_e` fields (all mutable; `category` and `code` are appended to the prior Error ABI) |
+| `console.info(message, fields)` | `tlang_console_json(__fib, TLANG_LOG_INFO, message, fields)`; all levels emit one serialized JSON Lines record |
 | `ctx.method`, `ctx.path`, `ctx.rawQuery`, `ctx.body` | `l_ctx->method`, `l_ctx->path`, `l_ctx->query`, `l_ctx->body` |
 | `ctx.header(n)`, `ctx.param(n)` | `tlang_ctx_header(l_ctx, n)`, `tlang_ctx_param(l_ctx, n)` |
 | `ctx.query(n)` | `tlang_ctx_query(__fib, l_ctx, n)` |

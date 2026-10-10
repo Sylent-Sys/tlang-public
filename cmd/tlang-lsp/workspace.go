@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"path/filepath"
+
+	"tlang/project"
 )
 
 // overlayFS is the module.FileSystem the server analyzes through: the text of
@@ -45,7 +47,8 @@ func newOverlay(store *documentStore) *overlayFS {
 
 // projectRoot picks the directory that bounds import resolution for the
 // document at docPath: the longest workspace root containing it, else the
-// document's own directory (what `tlang check <file>` would use).
+// document's own directory. A discovered manifest supersedes that workspace
+// boundary; a missing, invalid, or ambiguous manifest preserves legacy roots.
 func projectRoot(roots []string, docPath string) string {
 	best := ""
 	for _, r := range roots {
@@ -54,7 +57,13 @@ func projectRoot(roots []string, docPath string) string {
 		}
 	}
 	if best == "" {
-		return filepath.Dir(docPath)
+		best = filepath.Dir(docPath)
+	}
+	// LSP uses manifest discovery only to select the import boundary. It never
+	// opens grants or applies requested capabilities; the overlay remains the
+	// module graph's source filesystem.
+	if discovered, err := project.Discover(best); err == nil {
+		return discovered.Root
 	}
 	return best
 }

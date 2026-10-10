@@ -479,6 +479,53 @@ void json_write_str(tlang_buf* b, tlang_string s) {
     tlang_buf_putc(b, '"');
 }
 
+static int utf8_sequence(const unsigned char* p, size_t left, size_t* n) {
+    unsigned char c = p[0];
+    if (c < 0x80) { *n = 1; return 1; }
+    if (c >= 0xC2 && c <= 0xDF) *n = 2;
+    else if (c >= 0xE0 && c <= 0xEF) *n = 3;
+    else if (c >= 0xF0 && c <= 0xF4) *n = 4;
+    else return 0;
+    if (left < *n) return 0;
+    if ((*n >= 2 && (p[1] & 0xC0) != 0x80) ||
+        (*n >= 3 && (p[2] & 0xC0) != 0x80) ||
+        (*n >= 4 && (p[3] & 0xC0) != 0x80)) return 0;
+    if ((*n == 3 && c == 0xE0 && p[1] < 0xA0) || (*n == 3 && c == 0xED && p[1] >= 0xA0) ||
+        (*n == 4 && c == 0xF0 && p[1] < 0x90) || (*n == 4 && c == 0xF4 && p[1] >= 0x90)) return 0;
+    return 1;
+}
+
+void json_write_str_utf8(tlang_buf* b, tlang_string s) {
+    static const char hex[] = "0123456789abcdef";
+    size_t i = 0;
+    tlang_buf_putc(b, '"');
+    while (i < s.len) {
+        unsigned char c = (unsigned char)s.data[i];
+        size_t n;
+        if (c >= 0x80 && !utf8_sequence((const unsigned char*)s.data + i, s.len - i, &n)) {
+            char esc[6] = {'\\','u','0','0',hex[c >> 4],hex[c & 15]};
+            tlang_buf_put(b, esc, sizeof esc); i++; continue;
+        }
+        if (c >= 0x80) { tlang_buf_put(b, s.data + i, n); i += n; continue; }
+        switch (c) {
+        case '"': TLANG_BUF_PUT_LIT(b, "\\\""); break;
+        case '\\': TLANG_BUF_PUT_LIT(b, "\\\\"); break;
+        case '\b': TLANG_BUF_PUT_LIT(b, "\\b"); break;
+        case '\f': TLANG_BUF_PUT_LIT(b, "\\f"); break;
+        case '\n': TLANG_BUF_PUT_LIT(b, "\\n"); break;
+        case '\r': TLANG_BUF_PUT_LIT(b, "\\r"); break;
+        case '\t': TLANG_BUF_PUT_LIT(b, "\\t"); break;
+        default:
+            if (c < 0x20) {
+                char esc[6] = {'\\','u','0','0',hex[c >> 4],hex[c & 15]};
+                tlang_buf_put(b, esc, sizeof esc);
+            } else tlang_buf_putc(b, (char)c);
+        }
+        i++;
+    }
+    tlang_buf_putc(b, '"');
+}
+
 void json_write_i64(tlang_buf* b, int64_t v) {
     char tmp[TLANG_FMT_I64_MAX];
     size_t n = tlang_fmt_i64(tmp, v);

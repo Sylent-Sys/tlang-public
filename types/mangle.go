@@ -36,7 +36,7 @@ func Mangle(t Type) string {
 			return "str"
 		case Void:
 			return "void"
-		case Context, Error, Transaction:
+		case Context, Error, Transaction, JsonValue:
 			return t.Name
 		}
 	case *Named:
@@ -94,12 +94,17 @@ func CType(t Type) string {
 			return "tlang_error"
 		case Transaction:
 			return "tlang_tx*"
+		case JsonValue:
+			return "tlang_json_value*"
 		}
 	case *Named:
 		if !t.IsGeneric() {
 			return StructCName(t) + "*"
 		}
 	case *Array:
+		if IsOptional(t.Elem) && IsBasic(NonOptional(t.Elem), JsonValue) {
+			return "tlang_slice_opt_JsonValue*"
+		}
 		return SliceCName(t.Elem) + "*"
 	case *Optional:
 		switch e := t.Elem.(type) {
@@ -109,6 +114,8 @@ func CType(t Type) string {
 				return "tlang_opt_" + Mangle(e)
 			case String:
 				return "tlang_string"
+			case JsonValue:
+				return "tlang_opt_json_value"
 			}
 		case *Named, *Array:
 			return CType(e)
@@ -124,12 +131,23 @@ func StructCName(n *Named) string { return "tl_" + Mangle(n) }
 // SliceCName returns the C slice header type for arrays of elem:
 // "tlang_slice_" + Mangle(elem), e.g. tlang_slice_i64, tlang_slice_User,
 // tlang_slice_opt_str, tlang_slice_arr_i32.
-func SliceCName(elem Type) string { return "tlang_slice_" + Mangle(elem) }
+func SliceCName(elem Type) string {
+	if IsOptional(elem) && IsBasic(NonOptional(elem), JsonValue) {
+		return "tlang_slice_opt_JsonValue"
+	}
+	return "tlang_slice_" + Mangle(elem)
+}
 
 // PredefinedSlice reports whether the runtime header (tlang.h) already
 // defines SliceCName(elem): elements int32, int64, float64, bool and
 // string. Codegen emits the typedef for every other element type.
 func PredefinedSlice(elem Type) bool {
+	if IsOptional(elem) && IsBasic(NonOptional(elem), JsonValue) {
+		return true
+	}
+	if IsBasic(elem, JsonValue) {
+		return true
+	}
 	b, ok := elem.(*Basic)
 	if !ok {
 		return false

@@ -30,6 +30,9 @@
 static int failures;
 static void nap_ms(int ms);
 
+
+static void test_environment_access_contract(void);
+
 typedef struct {
     int port;
     int stop;
@@ -85,6 +88,26 @@ static long long now_ms(void);
         }                                                                          \
     } while (0)
 
+static void __attribute__((unused)) test_environment_access_contract(void) {
+    static const tlang_string allowed[] = {TLANG_STR_INIT("TLANG_TEST_ALLOWED"), TLANG_STR_INIT("TLANG_TEST_UNSET")};
+    const tlang_program prog = {.env_names = allowed, .env_name_count = 2};
+    tlang_fiber fib;
+    tlang_string got;
+    memset(&fib, 0, sizeof fib);
+    CHECK(setenv("TLANG_TEST_ALLOWED", "", 1) == 0);
+    CHECK(unsetenv("TLANG_TEST_UNSET") == 0);
+    CHECK(tlang_grants_load_validate(&prog, NULL, &(tlang_config){0}, (char[8]){0}, 8) == 0);
+    got = tlang_env_get(&fib, TLANG_STR("TLANG_TEST_ALLOWED"));
+    CHECK(!fib.err && got.data != NULL && got.len == 0);
+    got = tlang_env_get(&fib, TLANG_STR("TLANG_TEST_UNSET"));
+    CHECK(!fib.err && got.data == NULL);
+    got = tlang_env_get(&fib, TLANG_STR("TLANG_TEST_DENIED"));
+    CHECK(fib.err && fib.error.status == 403 && tlang_str_eq(fib.error.category, TLANG_STR(TLANG_ERROR_PERMISSION)) &&
+          tlang_str_eq(fib.error.code, TLANG_STR("env.permission_denied")));
+    (void)tlang_take_error(&fib);
+    unsetenv("TLANG_TEST_ALLOWED");
+}
+
 /* ---- program-description validation (exactly one entry -> else exit 2) ---- */
 static void dummy_dispatcher(tlang_fiber* fib, tlang_ctx* ctx) { (void)fib; (void)ctx; }
 static void dummy_main(tlang_fiber* fib) { (void)fib; }
@@ -102,6 +125,64 @@ static void test_validation(void) {
     both.dispatcher = dummy_dispatcher;
     both.main = dummy_main;
     CHECK(tlang_main(0, NULL, &both) == 2);
+}
+
+static int g_grant_side_effects;
+static void grant_side_effect_main(tlang_fiber* fib) { (void)fib; g_grant_side_effects++; }
+
+static void test_grants_fail_before_script_side_effects(void) {
+    static const char manifest[] = "{\"schemaVersion\":1,\"language\":\"1\",\"entry\":\"main.tlang\",\"target\":{\"os\":[],\"arch\":[]},\"capabilities\":{\"env\":[],\"filesystem\":[],\"process\":[],\"network\":{\"connect\":[],\"listen\":[]},\"lifecycle\":{\"signals\":[]}},\"databases\":{},\"limits\":{}}";
+    static const char digest[] = "146abcb80af0f549d0fedc24b74770a859767388e216d8d30d0e6115f555b2bf";
+    static const char valid_grants[] = "{\"schemaVersion\":1,\"manifestSha256\":\"146abcb80af0f549d0fedc24b74770a859767388e216d8d30d0e6115f555b2bf\",\"capabilities\":{\"env\":[],\"filesystem\":[],\"process\":[],\"network\":{\"connect\":[],\"listen\":[]},\"lifecycle\":{\"signals\":[]}},\"databases\":{},\"limits\":{}}";
+    static const char insufficient_manifest[] = "{\"schemaVersion\":1,\"language\":\"1\",\"entry\":\"main.tlang\",\"target\":{\"os\":[],\"arch\":[]},\"capabilities\":{\"env\":[\"APP_MODE\"],\"filesystem\":[],\"process\":[],\"network\":{\"connect\":[],\"listen\":[]},\"lifecycle\":{\"signals\":[]}},\"databases\":{},\"limits\":{}}";
+    static const char insufficient_digest[] = "67011806f844c1f4132efe62995fd81ae0414c37a264e1e9efe859c07a0ab255";
+    tlang_program prog;
+    char path[] = "/tmp/tlang-grants-XXXXXX";
+    int fd;
+    memset(&prog, 0, sizeof prog);
+    prog.main = grant_side_effect_main;
+    prog.has_manifest = true;
+    prog.manifest_json.data = manifest;
+    prog.manifest_json.len = strlen(manifest);
+    prog.manifest_sha256.data = digest;
+    prog.manifest_sha256.len = strlen(digest);
+    g_grant_side_effects = 0;
+    CHECK(tlang_main(0, NULL, &prog) == 2); /* missing grants */
+    CHECK(g_grant_side_effects == 0);
+    fd = mkstemp(path);
+    CHECK(fd >= 0);
+    if (fd >= 0) {
+        const char* invalid = "{\"schemaVersion\":1,\"manifestSha256\":\"bad\",\"secret\":\"grant-secret\"}";
+        (void)write(fd, invalid, strlen(invalid));
+        close(fd);
+        {
+            char* argv[] = {"program", "--tlang-grants", path};
+            CHECK(tlang_main(3, argv, &prog) == 2);
+            CHECK(g_grant_side_effects == 0);
+            fd = open(path, O_WRONLY | O_TRUNC);
+            CHECK(fd >= 0);
+            if (fd >= 0) {
+                (void)write(fd, valid_grants, strlen(valid_grants));
+                close(fd);
+            }
+            CHECK(tlang_main(3, argv, &prog) == 0);
+            CHECK(g_grant_side_effects == 1);
+            fd = open(path, O_WRONLY | O_TRUNC);
+            CHECK(fd >= 0);
+            if (fd >= 0) {
+                const char* insufficient = "{\"schemaVersion\":1,\"manifestSha256\":\"67011806f844c1f4132efe62995fd81ae0414c37a264e1e9efe859c07a0ab255\",\"capabilities\":{\"env\":[],\"filesystem\":[],\"process\":[],\"network\":{\"connect\":[],\"listen\":[]},\"lifecycle\":{\"signals\":[]}},\"databases\":{},\"limits\":{}}";
+                (void)write(fd, insufficient, strlen(insufficient));
+                close(fd);
+            }
+            prog.manifest_json.data = insufficient_manifest;
+            prog.manifest_json.len = strlen(insufficient_manifest);
+            prog.manifest_sha256.data = insufficient_digest;
+            prog.manifest_sha256.len = strlen(insufficient_digest);
+            CHECK(tlang_main(3, argv, &prog) == 2);
+            CHECK(g_grant_side_effects == 1);
+        }
+        unlink(path);
+    }
 }
 
 /* ---- script mode: init_globals then main, exit 0 ---- */
@@ -847,6 +928,7 @@ int main(void) {
     }
 
     test_validation();
+    test_grants_fail_before_script_side_effects();
     test_script_success();
     test_script_error();
     test_script_init_error();

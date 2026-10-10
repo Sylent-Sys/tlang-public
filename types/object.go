@@ -214,12 +214,11 @@ type TypeName struct {
 	Tag string
 }
 
-// Builtin is a universe object that is not a type: the namespaces console
-// and db.
+// Builtin is a namespace object that is not a type: console, db or env.
 type Builtin struct {
-	// Name is "console" or "db".
+	// Name is "console", "db" or "env".
 	Name string
-	// ID is BuiltinConsole or BuiltinDB.
+	// ID identifies the namespace.
 	ID BuiltinID
 }
 

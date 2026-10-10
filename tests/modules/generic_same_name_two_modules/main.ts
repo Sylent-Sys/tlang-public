@@ -10,5 +10,5 @@ fn id<T>(x: T): T {
 fn main(): void {
     let a = fromA();
     let b = id(2);
-    console.info(a + b);
+    console.info("sum", JsonValue.number(float64(a + b)));
 }

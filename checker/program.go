@@ -66,7 +66,8 @@ func (c *checker) runProgram(mods []*module.Module) {
 	c.analyzeEscape()         // pass 4
 	c.markMayFail()           // pass 5
 	c.selectEntryProgram()    // pass 6 (whole-program entry)
-	c.checkCNameCollisions()  // cross-declaration C-name collisions
+	c.analyzeProgramFeatures()
+	c.checkCNameCollisions() // cross-declaration C-name collisions
 }
 
 // buildModuleContexts creates one moduleCtx (and scope) per module, records
@@ -485,6 +486,8 @@ func standardExportObject(m *module.StandardModule, name string) types.Object {
 			return types.StandardExportObject(types.StandardExportDatabase)
 		case module.StandardExportConsole:
 			return types.StandardExportObject(types.StandardExportSystemConsole)
+		case module.StandardExportEnv:
+			return types.StandardExportObject(types.StandardExportSystemEnv)
 		}
 	}
 	return nil

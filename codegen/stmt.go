@@ -297,6 +297,10 @@ func (fc *funcCtx) assignErrorMember(target *ast.MemberExpression, sel *types.Se
 		field, ft = "message", types.Typ[types.String]
 	case types.BuiltinErrorStatus:
 		field, ft = "status", types.Typ[types.Int32]
+	case types.BuiltinErrorCategory:
+		field, ft = "category", types.Typ[types.String]
+	case types.BuiltinErrorCode:
+		field, ft = "code", types.Typ[types.String]
 	default:
 		fc.g.fail(internalErr(target.Pos(), "unsupported Error member %s", sel.Builtin.String()))
 	}
@@ -882,7 +886,7 @@ func itoa(n int) string { return strconv.Itoa(n) }
 
 // throwStmt lowers a throw (codegen design §7 Throw, plan D9): an Error value
 // becomes tlang_throw_value(__fib, <v>); a string or new Error(m[, s]) (also
-// new global Error) becomes tlang_throw(__fib, <status>, <msg>). Then an
+// new global Error) becomes tlang_throw_typed with internal/internal defaults. Then an
 // unconditional goto to the nearest handler, which marks it used. A throw
 // counts as an unconditional jump for the missing-return fallback (D24).
 func (fc *funcCtx) throwStmt(s *ast.ThrowStatement) {
@@ -892,8 +896,8 @@ func (fc *funcCtx) throwStmt(s *ast.ThrowStatement) {
 		if ne, ok := s.Value.(*ast.NewExpression); ok {
 			// throw new Error(m[, s]) uses tlang_throw with the message and
 			// status directly, rather than building an Error value first.
-			msg, status := fc.throwNewErrorParts(ne)
-			fc.blk.linef("tlang_throw(__fib, %s, %s);", status, msg)
+			msg, status, category, code := fc.throwNewErrorParts(ne)
+			fc.blk.linef("tlang_throw_typed(__fib, %s, %s, %s, %s);", status, msg, category, code)
 		} else {
 			v := fc.value(s.Value)
 			fc.blk.linef("tlang_throw_value(__fib, %s);", v.code)
@@ -901,7 +905,7 @@ func (fc *funcCtx) throwStmt(s *ast.ThrowStatement) {
 	} else {
 		// throw "msg" (a string): status 500, the string as the message.
 		v := fc.value(s.Value)
-		fc.blk.linef("tlang_throw(__fib, 500, %s);", v.code)
+		fc.blk.linef("tlang_throw_typed(__fib, 500, %s, TLANG_STR(\"internal\"), TLANG_STR(\"internal\"));", v.code)
 	}
 	fc.blk.linef("goto %s;", fc.failTarget())
 }
@@ -910,16 +914,18 @@ func (fc *funcCtx) throwStmt(s *ast.ThrowStatement) {
 // throw new Error(m[, s]) / throw new global Error(m[, s]) (codegen design §7,
 // §8.9): the message defaults to the empty string, the status to 500. The
 // Global flag has no effect (Error is a by-value tlang_error).
-func (fc *funcCtx) throwNewErrorParts(e *ast.NewExpression) (msg, status string) {
+func (fc *funcCtx) throwNewErrorParts(e *ast.NewExpression) (msg, status, category, code string) {
 	msg = `TLANG_STR("")`
 	status = "500"
+	category = `TLANG_STR("internal")`
+	code = `TLANG_STR("internal")`
 	if len(e.Args) >= 1 {
 		msg = fc.value(e.Args[0]).code
 	}
 	if len(e.Args) >= 2 {
 		status = fc.value(e.Args[1]).code
 	}
-	return msg, status
+	return msg, status, category, code
 }
 
 // tryCatchStmt lowers try { B } catch (e) { C } (codegen design §6.3, plan

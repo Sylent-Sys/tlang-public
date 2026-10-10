@@ -15,8 +15,8 @@ const (
 	BuiltinDB      // db
 
 	// console (§2.11): any number of string/number/bool arguments.
-	BuiltinConsoleLog   // console.log(...): void
-	BuiltinConsoleError // console.error(...): void
+	BuiltinConsoleLog   // reserved legacy ID; no longer source-visible
+	BuiltinConsoleError // reserved legacy ID; structured API has appended ID
 
 	// Explicit numeric conversions (§2.3); the callee identifier resolves to
 	// the universe TypeName int32/int64/float64.
@@ -77,7 +77,30 @@ const (
 	BuiltinTxQueryOne // tx.queryOne<T>(sql, args...): T | null
 
 	// Appended to preserve every existing BuiltinID numeric value.
-	BuiltinConsoleInfo // console.info(...): void
+	BuiltinConsoleInfo // historical ID; source API is appended below
+	BuiltinEnv         // env namespace
+	BuiltinEnvGet      // env.get(name: string): string | null, may fail
+	BuiltinConsoleDebug
+	BuiltinConsoleWarn
+	// Structured log variants append IDs; the old entry points above remain reserved.
+	BuiltinJsonFromNull
+	BuiltinJsonBool
+	BuiltinJsonNumber
+	BuiltinJsonString
+	BuiltinJsonArray
+	BuiltinJsonObject
+	BuiltinJsonKind
+	BuiltinJsonAsBool
+	BuiltinJsonAsNumber
+	BuiltinJsonAsString
+	BuiltinJsonArrayValues
+	BuiltinJsonObjectKeys
+	BuiltinJsonObjectValues
+	BuiltinJsonGet
+	BuiltinConsoleDebugFields
+	BuiltinConsoleInfoFields
+	BuiltinConsoleWarnFields
+	BuiltinConsoleErrorFields
 
 	numBuiltins
 )
@@ -90,6 +113,7 @@ const (
 	StandardExportNone StandardExportDescriptor = iota
 	StandardExportDatabase
 	StandardExportSystemConsole
+	StandardExportSystemEnv
 )
 
 // BuiltinRecv says what a builtin belongs to.
@@ -117,6 +141,12 @@ const (
 	RecvContext
 	// RecvTransaction: member of a Transaction value.
 	RecvTransaction
+	// RecvEnv: member of the env namespace.
+	RecvEnv
+	// RecvJsonValue: member of a JsonValue.
+	RecvJsonValue
+	// RecvJsonType: static JsonValue constructor.
+	RecvJsonType
 )
 
 // BuiltinInfo describes one builtin. The table is read-only.
@@ -161,6 +191,7 @@ var (
 	tBool    = Typ[Bool]
 	tString  = Typ[String]
 	tVoid    = Typ[Void]
+	tJson    = Typ[JsonValue]
 )
 
 var builtins = [numBuiltins]BuiltinInfo{
@@ -169,8 +200,8 @@ var builtins = [numBuiltins]BuiltinInfo{
 	BuiltinConsole: {Name: "console", Special: true},
 	BuiltinDB:      {Name: "db", Special: true},
 
-	BuiltinConsoleLog:   {Name: "log", Recv: RecvConsole, Method: true, Result: tVoid, Special: true},
-	BuiltinConsoleError: {Name: "error", Recv: RecvConsole, Method: true, Result: tVoid, Special: true},
+	BuiltinConsoleLog:   {Name: "legacy log", Recv: RecvNone, Special: true},
+	BuiltinConsoleError: {Name: "legacy error", Recv: RecvNone, Special: true},
 
 	BuiltinConvInt32:   {Name: "int32", Method: true, Result: tInt32, Special: true},
 	BuiltinConvInt64:   {Name: "int64", Method: true, Result: tInt64, Special: true},
@@ -220,7 +251,29 @@ var builtins = [numBuiltins]BuiltinInfo{
 	BuiltinTxQuery:    {Name: "query", Recv: RecvTransaction, Method: true, Fails: true, Allocates: true, Special: true},
 	BuiltinTxQueryOne: {Name: "queryOne", Recv: RecvTransaction, Method: true, Fails: true, Allocates: true, Special: true},
 
-	BuiltinConsoleInfo: {Name: "info", Recv: RecvConsole, Method: true, Result: tVoid, Special: true},
+	BuiltinEnv:                {Name: "env", Special: true},
+	BuiltinEnvGet:             {Name: "get", Recv: RecvEnv, Method: true, Fails: true, Allocates: true, Params: []Type{tString}, Result: NewOptional(tString)},
+	BuiltinConsoleInfo:        {Name: "legacy info", Recv: RecvNone, Special: true},
+	BuiltinConsoleDebug:       {Name: "legacy debug", Recv: RecvNone, Special: true},
+	BuiltinConsoleWarn:        {Name: "legacy warn", Recv: RecvNone, Special: true},
+	BuiltinJsonFromNull:       {Name: "nullValue", Recv: RecvJsonType, Method: true, Allocates: true, Params: []Type{}, Result: tJson},
+	BuiltinJsonBool:           {Name: "bool", Recv: RecvJsonType, Method: true, Allocates: true, Params: []Type{tBool}, Result: tJson},
+	BuiltinJsonNumber:         {Name: "number", Recv: RecvJsonType, Method: true, Allocates: true, Params: []Type{tFloat64}, Result: tJson},
+	BuiltinJsonString:         {Name: "string", Recv: RecvJsonType, Method: true, Allocates: true, Params: []Type{tString}, Result: tJson},
+	BuiltinJsonArray:          {Name: "array", Recv: RecvJsonType, Method: true, Allocates: true, Params: []Type{NewArray(tJson)}, Result: tJson},
+	BuiltinJsonObject:         {Name: "object", Recv: RecvJsonType, Method: true, Allocates: true, Fails: true, Params: []Type{NewArray(tString), NewArray(tJson)}, Result: tJson},
+	BuiltinJsonKind:           {Name: "kind", Recv: RecvJsonValue, Result: tString},
+	BuiltinJsonAsBool:         {Name: "asBool", Recv: RecvJsonValue, Method: true, Params: []Type{}, Result: NewOptional(tBool)},
+	BuiltinJsonAsNumber:       {Name: "asNumber", Recv: RecvJsonValue, Method: true, Params: []Type{}, Result: NewOptional(tFloat64)},
+	BuiltinJsonAsString:       {Name: "asString", Recv: RecvJsonValue, Method: true, Params: []Type{}, Result: NewOptional(tString)},
+	BuiltinJsonArrayValues:    {Name: "arrayValues", Recv: RecvJsonValue, Method: true, Allocates: true, Params: []Type{}, Result: NewOptional(NewArray(tJson))},
+	BuiltinJsonObjectKeys:     {Name: "objectKeys", Recv: RecvJsonValue, Method: true, Allocates: true, Params: []Type{}, Result: NewOptional(NewArray(tString))},
+	BuiltinJsonObjectValues:   {Name: "objectValues", Recv: RecvJsonValue, Method: true, Allocates: true, Params: []Type{}, Result: NewOptional(NewArray(tJson))},
+	BuiltinJsonGet:            {Name: "get", Recv: RecvJsonValue, Method: true, Allocates: true, Params: []Type{tString}, Result: NewOptional(tJson)},
+	BuiltinConsoleDebugFields: {Name: "debug-fields", Recv: RecvConsole, Method: true, Params: []Type{tString, NewOptional(tJson)}, Result: tVoid, Special: true},
+	BuiltinConsoleInfoFields:  {Name: "info-fields", Recv: RecvConsole, Method: true, Params: []Type{tString, NewOptional(tJson)}, Result: tVoid, Special: true},
+	BuiltinConsoleWarnFields:  {Name: "warn-fields", Recv: RecvConsole, Method: true, Params: []Type{tString, NewOptional(tJson)}, Result: tVoid, Special: true},
+	BuiltinConsoleErrorFields: {Name: "error-fields", Recv: RecvConsole, Method: true, Params: []Type{tString, NewOptional(tJson)}, Result: tVoid, Special: true},
 }
 
 // Info returns the table entry for id (the BuiltinInvalid entry for
@@ -248,7 +301,7 @@ func (id BuiltinID) IsDB() bool {
 var recvPrefix = [...]string{
 	RecvNone: "", RecvConsole: "console.", RecvDB: "db.", RecvInt32: "int32.", RecvInt64: "int64.",
 	RecvFloat64: "float64.", RecvBool: "bool.", RecvString: "string.", RecvArray: "T[].",
-	RecvError: "Error.", RecvContext: "Context.", RecvTransaction: "Transaction.",
+	RecvError: "Error.", RecvContext: "Context.", RecvTransaction: "Transaction.", RecvEnv: "env.",
 }
 
 // String returns a qualified name for diagnostics and debugging:
@@ -286,6 +339,8 @@ func MemberOf(recv Type, name string) BuiltinID {
 			r = RecvContext
 		case Transaction:
 			r = RecvTransaction
+		case JsonValue:
+			r = RecvJsonValue
 		default:
 			return BuiltinInvalid
 		}
@@ -296,13 +351,55 @@ func MemberOf(recv Type, name string) BuiltinID {
 }
 
 // NamespaceMember returns the member name of the namespace ns
-// (BuiltinConsole or BuiltinDB), or BuiltinInvalid.
+// (BuiltinConsole, BuiltinDB or BuiltinEnv), or BuiltinInvalid.
 func NamespaceMember(ns BuiltinID, name string) BuiltinID {
 	switch ns {
 	case BuiltinConsole:
+		switch name {
+		case "log":
+			return BuiltinInvalid
+		}
+		if legacy := DeprecatedBuiltinName(lookupMember(RecvConsole, name)); legacy != "" || name == "warn" || name == "error" {
+			return BuiltinInvalid
+		}
+		if member := StructuredConsoleMember(name); member != BuiltinInvalid {
+			return member
+		}
 		return lookupMember(RecvConsole, name)
 	case BuiltinDB:
 		return lookupMember(RecvDB, name)
+	case BuiltinEnv:
+		return lookupMember(RecvEnv, name)
+	}
+	return BuiltinInvalid
+}
+
+func StructuredConsoleMember(name string) BuiltinID {
+	switch name {
+	case "debug":
+		return BuiltinConsoleDebugFields
+	case "info":
+		return BuiltinConsoleInfoFields
+	case "warn":
+		return BuiltinConsoleWarnFields
+	}
+	return BuiltinInvalid
+}
+
+func DeprecatedBuiltinName(id BuiltinID) string {
+	switch id {
+	case BuiltinConsoleLog:
+		return "legacy log"
+	case BuiltinConsoleError:
+		return "legacy error"
+	}
+	return ""
+}
+
+func StaticConsoleMember(name string) BuiltinID {
+	switch name {
+	case "info":
+		return BuiltinConsoleInfoFields
 	}
 	return BuiltinInvalid
 }
@@ -311,14 +408,34 @@ func NamespaceMember(ns BuiltinID, name string) BuiltinID {
 // standard namespace. Historical builtin IDs may remain available through
 // NamespaceMember for ABI/tooling compatibility without being source-visible.
 func StandardNamespaceMember(ns BuiltinID, name string) BuiltinID {
-	if ns == BuiltinConsole && name == "log" {
+	if ns == BuiltinConsole && DeprecatedBuiltinName(lookupMember(RecvConsole, name)) != "" {
 		return BuiltinInvalid
 	}
 	return NamespaceMember(ns, name)
 }
 
+// JsonValueConstructor resolves one constructor exposed on the JsonValue type.
+func JsonValueConstructor(name string) BuiltinID {
+	switch name {
+	case "nullValue":
+		return BuiltinJsonFromNull
+	case "bool":
+		return BuiltinJsonBool
+	case "number":
+		return BuiltinJsonNumber
+	case "string":
+		return BuiltinJsonString
+	case "array":
+		return BuiltinJsonArray
+	case "object":
+		return BuiltinJsonObject
+	}
+	return BuiltinInvalid
+}
+
 var standardDB = &Builtin{Name: "db", ID: BuiltinDB}
 var standardConsole = &Builtin{Name: "console", ID: BuiltinConsole}
+var standardEnv = &Builtin{Name: "env", ID: BuiltinEnv}
 
 // StandardExportObject maps a stable front-end export descriptor to its
 // canonical semantic object.
@@ -328,6 +445,8 @@ func StandardExportObject(id StandardExportDescriptor) Object {
 		return standardDB
 	case StandardExportSystemConsole:
 		return standardConsole
+	case StandardExportSystemEnv:
+		return standardEnv
 	}
 	return nil
 }
@@ -340,6 +459,8 @@ func StandardBuiltin(id BuiltinID) *Builtin {
 		return standardDB
 	case BuiltinConsole:
 		return standardConsole
+	case BuiltinEnv:
+		return standardEnv
 	}
 	return nil
 }

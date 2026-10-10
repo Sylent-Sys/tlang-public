@@ -11,12 +11,53 @@ import (
 )
 
 func TestVirtualImportsAndNestedNamespace(t *testing.T) {
-	info, codes := checkProgram(t, map[string]string{"main.ts": `import * as system from "tlang/system"; fn main(): void { system.console.info("ok"); }`}, "main.ts")
+	info, codes := checkProgram(t, map[string]string{"main.ts": `import * as system from "tlang/system"; fn main(): void { system.console.info("ok", JsonValue.string("module")); }`}, "main.ts")
+	if len(codes) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes)
+	}
+	if len(info.Calls) != 2 {
+		t.Fatalf("calls = %d, want console plus JsonValue builtin calls", len(info.Calls))
+	}
+}
+
+func TestEnvGetAliasedStandardExportAndContract(t *testing.T) {
+	info, codes := checkProgram(t, map[string]string{"main.ts": `
+import { env as runtimeEnv } from "tlang/system";
+fn main(): void { let value: string | null = runtimeEnv.get("TOKEN"); }
+`}, "main.ts")
 	if len(codes) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes)
 	}
 	if len(info.Calls) != 1 {
 		t.Fatalf("calls = %d, want one builtin call", len(info.Calls))
+	}
+	for expr, call := range info.Calls {
+		if call.Builtin != types.BuiltinEnvGet || !call.MayFail {
+			t.Fatalf("env.get call = %+v, want fallible BuiltinEnvGet", call)
+		}
+		result := info.Types[expr].Type
+		if !types.IsOptional(result) || !types.IsString(types.NonOptional(result)) {
+			t.Fatalf("env.get result = %v, want string | null", result)
+		}
+	}
+	if len(info.Features.RuntimeAPIs) != 1 || info.Features.RuntimeAPIs[0] != types.RuntimeAPIEnvironment {
+		t.Fatalf("runtime APIs = %v, want [environment]", info.Features.RuntimeAPIs)
+	}
+	if len(info.Features.NativeRequirements) != 0 {
+		t.Fatalf("native requirements = %v, want none", info.Features.NativeRequirements)
+	}
+}
+
+func TestEnvGetRejectsWrongArguments(t *testing.T) {
+	for _, src := range []string{
+		`import { env } from "tlang/system"; fn main(): void { env.get(); }`,
+		`import { env } from "tlang/system"; fn main(): void { env.get(1); }`,
+		`import { env } from "tlang/system"; fn main(): void { env.get("A", "B"); }`,
+	} {
+		_, codes := checkProgram(t, map[string]string{"main.ts": src}, "main.ts")
+		if len(codes) == 0 || codes[0] != "E-TYPE" {
+			t.Errorf("diagnostics for %q = %v, want E-TYPE", src, codes)
+		}
 	}
 }
 

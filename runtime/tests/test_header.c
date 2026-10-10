@@ -87,6 +87,13 @@ _Static_assert(offsetof(tlang_slice_i32, items) == 0, "items first");
 
 _Static_assert(sizeof(tlang_string) == 2 * sizeof(void*), "tlang_string is a fat pointer");
 _Static_assert(offsetof(tlang_string, len) == sizeof(void*), "tlang_string.len");
+_Static_assert(offsetof(tlang_error, status) == 0, "error status first");
+_Static_assert(offsetof(tlang_error, message) == offsetof(tlang_error, status) +
+               ((sizeof(int32_t) + _Alignof(tlang_string) - 1) / _Alignof(tlang_string)) * _Alignof(tlang_string),
+               "error message ABI");
+_Static_assert(offsetof(tlang_error, category) == offsetof(tlang_error, message) + sizeof(tlang_string), "error category ABI");
+_Static_assert(offsetof(tlang_error, code) == offsetof(tlang_error, category) + sizeof(tlang_string), "error code ABI");
+_Static_assert(sizeof(tlang_error) == offsetof(tlang_error, code) + sizeof(tlang_string), "error ABI size");
 _Static_assert(offsetof(struct tlang_fiber, err) == 0, "fiber err first");
 _Static_assert(ARENA_ALIGNMENT == 8, "spec §6.2 alignment");
 _Static_assert(ARENA_CHUNK_SIZE == 128 * 1024, "spec §6.2 chunk size");
@@ -169,6 +176,16 @@ static void test_strings(void) {
 
     CHECK(str_is(tlang_bool_to_string(NULL, true), "true"));
     CHECK(str_is(tlang_bool_to_string(NULL, false), "false"));
+}
+
+static void test_error_value_helpers(void) {
+    tlang_error e = tlang_error_make(TLANG_STR("message"), 418);
+    CHECK(e.status == 418 && str_is(e.message, "message"));
+    CHECK(str_is(e.category, TLANG_ERROR_INTERNAL));
+    CHECK(str_is(e.code, TLANG_ERROR_CODE_INTERNAL));
+    e.category = TLANG_STR(TLANG_ERROR_DATABASE);
+    e.code = TLANG_STR(TLANG_ERROR_CODE_DATABASE_ERROR);
+    CHECK(str_is(e.category, "database") && str_is(e.code, "database_error"));
 }
 
 static void test_numbers(void) {
@@ -301,6 +318,7 @@ static void test_shapes(void) {
 
 int main(void) {
     test_strings();
+    test_error_value_helpers();
     test_numbers();
     test_optionals_and_values();
     test_json_inline();

@@ -148,7 +148,8 @@ void tlang_ctx_set_header(tlang_fiber* fib, tlang_ctx* ctx, tlang_string name,
         return;
     }
     if (!is_token(name) || !valid_header_value(value) || name_is_managed(name)) {
-        tlang_throw(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_BAD_HEADER));
+        tlang_throw_typed(fib, TLANG_STATUS_INTERNAL, TLANG_STR(TLANG_MSG_BAD_HEADER),
+                          TLANG_STR(TLANG_ERROR_PROTOCOL), TLANG_STR(TLANG_ERROR_CODE_INVALID_HEADER));
         return;
     }
     tlang_resp_header* h = (tlang_resp_header*)tlang_alloc_raw(fib, sizeof *h);

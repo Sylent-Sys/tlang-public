@@ -310,8 +310,18 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
     sigset_t block, old;
     int mask_saved = 0;
 
-    (void)argc;
-    (void)argv;
+    const char* grants_path = NULL;
+    int i;
+
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--tlang-grants") == 0 && grants_path == NULL && i + 1 < argc &&
+            argv[i + 1] != NULL && argv[i + 1][0] != '\0') {
+            grants_path = argv[++i];
+        } else {
+            tlang_log_error("tlang: invalid runtime arguments");
+            return 2;
+        }
+    }
 
     /* Validate the program description: exactly one entry. */
     if ((prog->dispatcher != NULL) == (prog->main != NULL)) {
@@ -320,6 +330,12 @@ int tlang_main(int argc, char** argv, const tlang_program* prog) {
     }
 
     if (tlang_config_load(&cfg, err, sizeof err) != 0) {
+        tlang_log_error("tlang: %s", err);
+        return 2;
+    }
+
+    if (prog->has_manifest) cfg.database_url = NULL;
+    if (tlang_grants_load_validate(prog, grants_path, &cfg, err, sizeof err) != 0) {
         tlang_log_error("tlang: %s", err);
         return 2;
     }

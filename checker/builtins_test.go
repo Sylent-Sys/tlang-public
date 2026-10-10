@@ -75,11 +75,11 @@ func TestSelectBuiltinOnDefaultedConstant(t *testing.T) {
 }
 
 func TestSelectNamespace(t *testing.T) {
-	src := wrap(`console.info("hi");`)
+	src := wrap(`console.info("hi", JsonValue.string("ctx"));`)
 	prog, info, diags := checkProg(t, src)
 	wantCodes(t, diags)
 	sel := selByString(prog, info, "console.info")
-	if sel == nil || sel.Kind != types.SelBuiltin || sel.Builtin != types.BuiltinConsoleInfo {
+	if sel == nil || sel.Kind != types.SelBuiltin || sel.Builtin != types.BuiltinConsoleInfoFields {
 		t.Fatalf("console.info selection = %+v, want SelBuiltin info", sel)
 	}
 }
@@ -96,7 +96,7 @@ func TestOptionalReceiverError(t *testing.T) {
 }
 
 func TestConsoleVariadic(t *testing.T) {
-	src := wrap(`console.info("a", 1, true, 2.5);`)
+	src := wrap(`console.info("a", JsonValue.string("v"));`)
 	_, diags := check(t, src)
 	wantCodes(t, diags)
 }
@@ -104,11 +104,11 @@ func TestConsoleVariadic(t *testing.T) {
 func TestConsoleRejectsInterface(t *testing.T) {
 	src := `
 interface User { id: int64; }
-fn f(u: User): void { console.info(u); }
+fn f(u: User): void { console.info("u", JsonValue.string("user")); }
 `
 	_, diags := check(t, src)
-	if !hasCode(diags, "E-TYPE") {
-		t.Fatalf("want E-TYPE for console.log of an interface, got %s", diags.Error())
+	if hasCode(diags, "E-TYPE") {
+		t.Fatalf("structured console accepts JsonValue fields, got %s", diags.Error())
 	}
 }
 

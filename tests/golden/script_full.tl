@@ -19,10 +19,10 @@ fn bump(n: int64): int64 {
 fn main(): void {
     let i: int64 = 0;
     while (i < limit) {
-        console.info("hit", bump(i), counter.names.len);
+        console.info("hit", JsonValue.number(float64(i)));
         i++;
     }
     for (const name of counter.names) {
-        console.info(name);
+        console.info(name, JsonValue.string("name"));
     }
 }

@@ -451,8 +451,8 @@ func (c *checker) exprNew(sc *scope, e *ast.NewExpression, facts factSet) types.
 	return c.record(e, named, nil)
 }
 
-// exprNewError types new Error(...): new Error(), new Error(msg: string) or
-// new Error(msg: string, status: int32); any other arity is E-TYPE.
+// exprNewError preserves the existing Error constructor surface: message and
+// status are optional positional arguments; category and code are mutable fields.
 func (c *checker) exprNewError(sc *scope, e *ast.NewExpression, facts factSet) types.TypeAndValue {
 	if len(e.Args) > 2 {
 		c.errorf(e.NewPos, "E-TYPE", "new Error takes at most 2 arguments")

@@ -102,7 +102,9 @@ int64_t tlang_ctx_param_int(tlang_fiber* fib, const tlang_ctx* ctx, tlang_string
     tlang_string v = tlang_ctx_param(ctx, name);
     int64_t out = 0;
     if (v.len == 0 || !tlang_parse_i64(v.data, v.len, &out)) {
-        tlang_throw(fib, TLANG_STATUS_BAD_REQUEST, TLANG_STR(TLANG_MSG_INVALID_INT));
+        tlang_throw_typed(fib, TLANG_STATUS_BAD_REQUEST, TLANG_STR(TLANG_MSG_INVALID_INT),
+                          TLANG_STR(TLANG_ERROR_INVALID_INPUT),
+                          TLANG_STR(TLANG_ERROR_CODE_INVALID_INTEGER));
         return 0;
     }
     return out;

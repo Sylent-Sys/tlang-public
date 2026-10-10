@@ -56,7 +56,7 @@ const (
 	// Context is the builtin request context (C tlang_ctx*), a reference.
 	Context
 	// Error is the builtin error value (C tlang_error, by value) with
-	// members message: string and status: int32.
+	// mutable message: string, status: int32, category: string, and code: string.
 	Error
 	// Transaction is the builtin transaction handle (C tlang_tx*), only
 	// available inside db.transaction.
@@ -69,6 +69,8 @@ const (
 	// UntypedNull is the type of the null literal before it takes the
 	// expected optional type. It has no default type.
 	UntypedNull
+	// JsonValue is the opt-in generic JSON value type.
+	JsonValue
 )
 
 // Basic is a predeclared type. Use the singletons in Typ; never allocate a
@@ -96,6 +98,7 @@ var Typ = [...]*Basic{
 	UntypedInt:   {UntypedInt, "untyped int"},
 	UntypedFloat: {UntypedFloat, "untyped float"},
 	UntypedNull:  {UntypedNull, "null"},
+	JsonValue:    {JsonValue, "JsonValue"},
 }
 
 // String returns Name.

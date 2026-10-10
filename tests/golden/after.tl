@@ -6,7 +6,7 @@ fn allow(ctx: Context): bool {
 }
 
 fn metric(ctx: Context): void {
-    console.info("done");
+    console.info("done", JsonValue.string("done"));
 }
 
 fn audit(ctx: Context): void {

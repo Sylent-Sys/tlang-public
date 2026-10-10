@@ -18,6 +18,7 @@ const (
 	StandardExportInvalid StandardExportID = iota
 	StandardExportDB
 	StandardExportConsole
+	StandardExportEnv
 )
 
 // StandardExport describes one named export of a standard module.
@@ -37,7 +38,7 @@ type StandardModule struct {
 
 var standardModules = [...]StandardModule{
 	{ID: StandardDB, Specifier: "tlang/db", Available: true, Exports: []StandardExport{{ID: StandardExportDB, Name: "db"}}},
-	{ID: StandardSystem, Specifier: "tlang/system", Available: true, Exports: []StandardExport{{ID: StandardExportConsole, Name: "console"}}},
+	{ID: StandardSystem, Specifier: "tlang/system", Available: true, Exports: []StandardExport{{ID: StandardExportConsole, Name: "console"}, {ID: StandardExportEnv, Name: "env"}}},
 	{ID: StandardHTTP, Specifier: "tlang/http", Available: false},
 }
 

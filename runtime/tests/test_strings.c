@@ -189,9 +189,13 @@ static void test_to_string_and_int(void) {
     g_fib.err = 0;
     CHECK(tlang_str_to_int(&g_fib, TLANG_STR("x")) == 0);
     CHECK(g_fib.err && g_fib.error.status == TLANG_STATUS_BAD_REQUEST);
+    CHECK(tlang_str_eq(g_fib.error.category, TLANG_STR(TLANG_ERROR_INVALID_INPUT)));
+    CHECK(tlang_str_eq(g_fib.error.code, TLANG_STR(TLANG_ERROR_CODE_INVALID_INTEGER)));
     g_fib.err = 0;
     CHECK(tlang_str_to_int(&g_fib, TLANG_STR("99999999999999999999")) == 0);
     CHECK(g_fib.err && g_fib.error.status == 400);
+    CHECK(tlang_str_eq(g_fib.error.category, TLANG_STR(TLANG_ERROR_INVALID_INPUT)));
+    CHECK(tlang_str_eq(g_fib.error.code, TLANG_STR(TLANG_ERROR_CODE_INVALID_INTEGER)));
 }
 
 static void test_mod_f64(void) {

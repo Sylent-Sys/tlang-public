@@ -1,19 +1,21 @@
-# TLang Modules — Implemented Design and Standard-Module Draft
+# TLang Modules — Implemented Design and Approved Standard-Module Contracts
 
 > **Status**
 >
 > - Local-file modules (§§1–11): implemented design of record.
 > - Compilation model: one generated C translation unit.
-> - Standard modules (§12): draft; not implemented.
+> - Standard modules (§12): Phase 2 contracts approved; implementation status is
+>   recorded in §12.6.
 > - §0 records the historical pre-module baseline.
 >
 > Any divergence between §§1–11 and shipped behavior is a documentation or
 > implementation defect and should be resolved explicitly.
 
-*Original status:* PROPOSAL / RFC. This document records the design for adding a
-module system (`import` / `export`) to TLang so a program can span many files
-instead of living in one "god file." It is a design to discuss and approve, not
-a committed decision. It is deliberately written to the same bar as
+This document records the implemented design for the local module system
+(`import` / `export`) and the approved design contracts for compiler-provided
+standard modules, so a program can span many files instead of living in one
+"god file." Unimplemented standard-module behavior is labeled as such. It is
+deliberately written to the same bar as
 `docs/DESIGN.md`: every claim about the existing compiler is checked against the
 current source, and every open choice is named with a recommendation and a
 reason.
@@ -556,13 +558,12 @@ specifier grammar reserved so they can arrive later without breaking changes.
 
 ## 12. Compiler-provided standard modules — design direction
 
-**Status: draft, not implemented.** This section records proposed acceptance
-requirements for compiler-provided modules. In this section, **must** denotes a
-requirement for an accepted implementation, **should** denotes a preferred
-choice that requires documented justification to change, and **may** denotes
-permission. Statements about current behavior are explicitly labeled
-"currently". The existing local-file module implementation remains unchanged
-until this draft is accepted and implemented.
+**Status: contracts approved; implementation is partial.** This section records
+the acceptance requirements for compiler-provided modules. In this section,
+**must** denotes a requirement for a conforming implementation, **should**
+denotes a preferred choice that requires documented justification to change,
+and **may** denotes permission. Statements about current behavior are explicitly
+labeled "currently". The local-file module implementation remains unchanged.
 
 ### 12.1 Agreed direction
 
@@ -574,8 +575,8 @@ until this draft is accepted and implemented.
 - **Initial module roots.** The planned roots are `tlang/db`, `tlang/http`, and
   `tlang/system`. `db` and HTTP APIs remain separate; `system` is the home for
   console, JSON helpers, environment/configuration, UUID, date/time, and
-  platform APIs. This is an intentionally broad initial scope; exact exports
-  remain to be designed.
+  platform APIs. The approved environment and structured console contracts are
+  specified in §12.6; other exports remain staged by the roadmap.
 - **Use the implemented import/export forms.** Standard specifiers reuse the
   existing import declaration and binding syntax: named imports and aliases,
   default imports (optionally combined with named imports), namespace imports,
@@ -659,19 +660,27 @@ platform error number.
 
 #### 12.3.1 Environment and console
 
-- Environment access is read-only and lookup-only; enumeration and mutation are
-  not provided. A lookup takes an exact variable name. The name must be listed
-  in project metadata and separately granted at runtime. An undeclared or
-  ungranted read returns a permission error, distinct from an unset variable.
-- Console provides structured `debug`, `info`, `warn`, and `error` logging.
-  Records are JSON Lines with UTC RFC 3339 timestamp, level, message, and
-  optional scalar/JSON fields (string, number, boolean, null, or JSON value).
-  Logging is best-effort: sink failures do not fail application operations and
-  are reported through runtime diagnostics/health output. During the breaking
-  import migration, existing `console.log` is replaced by `console.info`; no
-  compatibility alias is implied. The runtime serializes complete JSON-line
-  records so writes from scheduler threads do not interleave. Log calls may
-  allocate in the current arena but do not suspend application fibers.
+- The approved source contract is `env.get(name: string): string | null`.
+  Environment access is read-only and lookup-only; enumeration and mutation
+  are not provided. Lookup uses the exact name supplied, without prefix matching
+  or case folding. The name must be listed in the project manifest and separately
+  granted at runtime. An undeclared or ungranted read throws an `Error` with
+  category `permission`; an authorized but unset variable returns `null`.
+  Permission denial and absence are therefore distinct. Denials carry status
+  403, category `permission`, and code `env.permission_denied`.
+- The approved console signatures are
+  `console.debug/info/warn/error(message: string, fields?: Record<string, JsonValue | null>): void`;
+  `Record` here is specification notation for a string-keyed JSON object, not a
+  claim that this type constructor is implemented in TLang. Each call emits one
+  JSON Lines record with UTC RFC 3339 `timestamp`, `level`, `message`, and a
+  nested `fields` object (empty when omitted). Field values are `JsonValue` or
+  `null`. The envelope owns `timestamp`, `level`, and `message`; application
+  fields stay nested and cannot replace envelope metadata, even when a field has
+  one of those names. Logging is best-effort and must not fail an application
+  operation; complete records are serialized so scheduler-thread writes do not
+  interleave. Invalid UTF-8 bytes in message and field strings are escaped as
+  individual `\\u00XX` sequences. Complete records are limited to 1 MiB and an
+  oversized record is dropped with a runtime diagnostic.
 
 #### 12.3.2 JSON
 
@@ -690,6 +699,9 @@ platform error number.
   or output can exceed practical request-arena limits. Convenience whole-value
   APIs are bounded; request-scoped results live in the request arena, and data
   retained beyond that lifetime requires an explicit clone/ownership transition.
+  Phase 2.5 ships only the `JsonValue` tagged constructors, kind and scalar
+  accessors, array/object extraction, and object lookup needed to construct
+  structured console fields; parsing/stringifying remain future work.
 
 #### 12.3.3 Time and date
 
@@ -906,8 +918,7 @@ produce clear build diagnostics.
   rechecked at use against the validated grants, including path containment and
   resolved network endpoints. Missing, malformed, unsupported, or insufficient
   grants fail closed with a diagnostic and nonzero startup status. The concrete
-  manifest/config syntax and deployment handoff format are defined by the
-  project-manifest design.
+  manifest/grants syntax and deployment handoff format are defined in §12.6.
 - DB operations, HTTP client/server I/O, and streaming system APIs use the
   existing fiber scheduler's suspension/cancellation model; they do not add a
   second futures/task runtime. Synchronous-looking APIs may suspend the current
@@ -949,21 +960,25 @@ data returns typed errors, and results may vary across host data versions.
 These differences do not weaken deterministic compiler output or deterministic
 ISO/UUID serialization.
 
-The above decisions close the six design questions at the contract level. Exact
-source declarations, detailed schemas, and concrete manifest syntax remain
-implementation/API specification work; they must conform to these contracts
-and do not reopen selected policy without a language-design revision.
+The above decisions close the six design questions at the contract level. The
+approved manifest/grants schemas and the exact environment/logging contracts are
+specified in §12.6. Remaining standard API declarations and implementations must
+conform to these contracts and do not reopen selected policy without a
+language-design revision.
 
 ### 12.5 Recommended first implementation boundary
 
-Deliver the draft in independently testable phases rather than one release-sized
-change:
+Deliver the approved design in independently testable phases rather than one
+release-sized change:
 
-1. **Virtual modules and migration:** implement `tlang/...` resolution, import-
-   gate existing `db`/console behavior, migrate examples, and keep current
-   lowerings/runtime behavior behind the imports.
-2. **Capability foundation:** specify project-manifest/runtime-grant schemas,
-   startup validation, stable errors, environment access, and structured logs.
+1. **Virtual modules and migration:** implemented for `tlang/db` and
+   `tlang/system` (`db`, `env`, and structured console logging);
+   `tlang/http` remains reserved but unavailable.
+2. **Capability foundation:** the version-1 manifest/grants schemas and
+   validation contract are specified in §12.6; strict Go parsing, manifest
+   discovery/CLI integration, generic feature analysis, and the Error category/
+   code ABI exist. Runtime grant loading/enforcement and startup validation,
+   `env.get`, and structured logging remain unimplemented.
 3. **Generated/common data APIs:** UUID, time, generic JSON, bounded streaming,
    and explicit lifetime tests/benchmarks.
 4. **HTTP:** App/dispatcher lowering, server framework, client, destination
@@ -978,4 +993,150 @@ change:
 Each phase must define public declarations, ownership/lifetimes, error surface,
 target matrix, security tests, and performance budgets before implementation.
 Preserve existing builtin IDs and lowerings behind imported exports initially.
-This remains a draft, not implemented behavior.
+The contracts are approved; only the implementation explicitly identified above
+is present. This roadmap does not imply that runtime grants, environment access,
+or structured logging are complete.
+
+### 12.6 Approved Phase 2 contracts and implementation status
+
+This subsection fixes the version-1 project document and API contracts. JSON
+objects are closed schemas: unknown or duplicate keys, malformed/trailing JSON,
+unsupported versions, invalid types or values, and documents larger than 1 MiB
+are rejected. Every object member shown as required is required; optional members
+may be omitted. Arrays are JSON arrays (not `null`). The Go `project` package
+implements parsing/validation of both schemas; runtime grant consumption is a
+separate, unimplemented integration. Parser and validation errors do not echo
+document bytes, filesystem paths, field values, or grant URLs/credentials.
+
+#### 12.6.1 Manifest (`tlang.json`)
+
+The manifest has exactly these top-level members:
+
+```json
+{
+  "schemaVersion": 1,
+  "language": "1",
+  "entry": "src/main.tlang",
+  "target": {"os": ["linux"], "arch": ["amd64"]},
+  "capabilities": {
+    "env": [],
+    "filesystem": [],
+    "process": [],
+    "network": {"connect": [], "listen": []},
+    "lifecycle": {"signals": []}
+  },
+  "databases": {},
+  "limits": {}
+}
+```
+
+- `schemaVersion` is the integer `1`; `language` is the string `"1"`.
+  `entry` is a project-relative `.ts` or `.tlang` path. `target.os` and
+  `target.arch` are unique arrays of supported Go platform names; an empty
+  array imposes no restriction.
+- `capabilities.env` is a unique array of environment variable names.
+  `filesystem` entries have exactly `root` (project-relative path) and `modes`
+  (unique members of `read`, `write`, `create`, `delete`, `list`). `process`
+  entries have exactly `executable` (an exact bare executable identity) and
+  optional positive `maxArgs` / `maxOutputBytes` constraints.
+- Each `network.connect` / `network.listen` rule has `protocol` (`tcp` or `udp`),
+  optional `host` (an exact DNS name or IP address), nonempty `ports` (inclusive
+  `{from, to}` ranges within 1..65535), and `groups` (unique named scopes).
+  At least one of `host` or `groups` is required. `lifecycle.signals` contains
+  unique `SIGINT` / `SIGTERM` values.
+- `databases` maps each resource name to exactly `{ "engine": ..., "config":
+  ... }`; engine is `postgres` or `sqlite`, and `config` is a non-secret
+  identifier. URLs and credentials do not belong in the manifest.
+- `limits` may contain nonnegative integer bounds: `maxWorkers` (256),
+  `maxQueueCapacity` (65536), `maxDeadlineMs` (86400000), `maxFileBytes`
+  (1073741824), `maxProcessOutputBytes` (67108864), `maxNetworkConnections`
+  (65536), and `maxDatabaseConnections` (4096). Omitted or zero means no
+  manifest-specified bound; nonzero values cannot exceed the listed ceiling.
+
+Manifest discovery searches the supplied path and its ancestors for exactly one
+`tlang.json`; none, multiple manifests, or an invalid manifest is an error. The
+CLI uses the manifest's `entry` when invoked with the project directory and
+requires an explicit file argument to match that entry. This discovery and CLI
+integration is implemented. It does not authorize capabilities or cause runtime
+grants to be loaded.
+
+#### 12.6.2 Runtime grants
+
+The grants document has exactly `schemaVersion`, `manifestSha256`,
+`capabilities`, `databases`, and `limits`. `schemaVersion` is integer `1`;
+`manifestSha256` is 64 lowercase hexadecimal characters and is SHA-256 of the
+**exact manifest file bytes**, before parsing or normalization. A formatting or
+line-ending change to the manifest therefore requires a matching grants digest.
+The `capabilities` and `limits` objects use the same shapes and validation rules
+as the manifest. `databases` maps the same resource names to `{ "url": "..." }`;
+URLs/credentials are accepted here, not in the manifest, and must match the
+declared engine (`postgres`/`postgresql` for PostgreSQL; `file`/`sqlite` for
+SQLite).
+
+Its JSON shape is:
+
+```json
+{
+  "schemaVersion": 1,
+  "manifestSha256": "<64 lowercase hex characters>",
+  "capabilities": {
+    "env": [],
+    "filesystem": [],
+    "process": [],
+    "network": {"connect": [], "listen": []},
+    "lifecycle": {"signals": []}
+  },
+  "databases": {},
+  "limits": {}
+}
+```
+
+The digest placeholder is explanatory, not a literal accepted value; the actual
+field must contain the lowercase SHA-256 hex digest described above.
+
+Validation binds the digest to the manifest, requires exact database-name and
+capability coverage (sets are order-independent), allows process grant bounds to
+be narrower than requested bounds, and rejects grant limits that loosen any
+nonzero requested limit. Unspecified requested limits can be bounded by grants.
+Malformed or insufficient documents fail closed. `ParseGrants`,
+`ValidateGrants`, and `ParseAndValidateGrants` implement these checks in the Go
+project package. No runtime or CLI path currently reads a grants document,
+checks it at startup, or enforces a grant on an operation; do not treat these
+library APIs as completed runtime capability enforcement.
+
+#### 12.6.3 Environment and structured console APIs
+
+The approved source contracts are:
+
+```text
+env.get(name: string): string | null
+console.debug(message: string, fields?: Record<string, JsonValue | null>): void
+console.info(message: string, fields?: Record<string, JsonValue | null>): void
+console.warn(message: string, fields?: Record<string, JsonValue | null>): void
+console.error(message: string, fields?: Record<string, JsonValue | null>): void
+```
+
+These signatures are contract notation, not shipped declarations. `env.get`
+looks up one exact name; no enumeration, mutation, globbing, prefix lookup, or
+case folding is provided. A name absent from manifest requests or runtime grants
+produces a permission-category `Error`; an authorized name that is unset returns
+`null`. The latter is not an error.
+
+Each console call writes one JSON object followed by a newline. The record has
+`timestamp` (UTC RFC 3339), `level` (`debug`, `info`, `warn`, or `error`),
+`message`, and `fields` (a string-keyed object whose values are `JsonValue` or
+`null`). Metadata keys are owned by the record envelope; application fields are
+nested and cannot override the timestamp, level, or message. Logging is
+best-effort and writes of complete records must not interleave across scheduler
+threads. `JsonValue` here uses the generic JSON value domain defined in §12.3.2.
+
+The standard-module registry exposes `db` from `tlang/db` and `console`/`env`
+from `tlang/system`; it reserves but does not expose `tlang/http`. Phase 2.5
+implements authorized `env.get`, all four structured console methods, and the
+minimal `JsonValue` constructor/accessor surface. Feature analysis currently
+reports generic reachable runtime APIs (`database`, `http`, `console`) and the
+`libpq` native requirement; it does not infer database engines or validate
+requested/granted capabilities. `Error` currently carries `status` and
+`message`, with appended mutable `category` and `code` string fields and
+`internal` defaults, in the language model, generated C ABI, and runtime throw /
+catch implementation.
